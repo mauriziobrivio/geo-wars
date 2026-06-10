@@ -296,11 +296,15 @@ function hsInsert(entry) {
 }
 function fmtTime(sec) { const m = (sec / 60) | 0, s2 = (sec % 60) | 0; return m + ':' + ('' + s2).padStart(2, '0'); }
 
-/* ---------------- world leaderboard (Supabase REST, no libraries) ----
-   The publishable key below is safe to ship: row-level security only
-   permits reading scores and inserting constraint-checked rows.       */
+/* ---------------- world leaderboard (Supabase, no libraries) ---------
+   The key below is the project's public anon key — safe to ship.
+   Reads go straight to REST (row-level security: select only).
+   Submissions go through the submit-score edge function, which
+   validates plausibility server-side and rate-limits by IP; direct
+   table inserts are blocked entirely.                                 */
 const WORLD_URL = 'https://artypnnxsdovgmsznlbg.supabase.co/rest/v1/geo_wars_scores';
-const WORLD_KEY = 'sb_publishable_q8rUAXLwE04SPpJyADTw2g_cfDFI87B';
+const WORLD_FN = 'https://artypnnxsdovgmsznlbg.supabase.co/functions/v1/submit-score';
+const WORLD_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFydHlwbm54c2Rvdmdtc3pubGJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNjc1NTQsImV4cCI6MjA5MDY0MzU1NH0.daE4ZNhyIM22l3tAR6EeQVcmDT8QEuDlosoPzgXiEkQ';
 let worldCache = null, worldCacheT = 0, worldStatus = 'idle', lastSubmit = null;
 
 function worldHeaders() {
@@ -316,21 +320,18 @@ async function submitWorldScore(entry) {
   if (typeof fetch === 'undefined') return;
   try {
     lastSubmit = { n: entry.n, s: entry.s };
-    const res = await timedFetch(WORLD_URL, {
+    const res = await timedFetch(WORLD_FN, {
       method: 'POST',
-      headers: Object.assign(worldHeaders(), { Prefer: 'return=minimal' }),
+      headers: worldHeaders(),
       body: JSON.stringify({
         tag: entry.n, score: entry.s, max_mult: entry.m,
         wave: entry.w || 1, kills: entry.k || 0, run_time: entry.t || 0
       })
     });
     if (!res.ok) throw 0;
+    const out = await res.json();
     worldCacheT = 0;   // bust the cache so the board shows the new entry
-    const r2 = await timedFetch(WORLD_URL + '?select=id&score=gt.' + entry.s,
-      { headers: Object.assign(worldHeaders(), { Prefer: 'count=exact', Range: '0-0' }) });
-    const cr = r2.headers.get('content-range');
-    const total = cr ? parseInt(cr.split('/')[1], 10) : NaN;
-    if (!isNaN(total)) showBanner('WORLD RANK #' + fmt(total + 1), '#23e6ff', 2600);
+    if (out && out.rank) showBanner('WORLD RANK #' + fmt(out.rank), '#23e6ff', 2600);
     if (state === 'scores' && scoreTab === 'world') renderWorld(true);
   } catch (e) { /* offline — the local board still has it */ }
 }
@@ -643,7 +644,12 @@ window.addEventListener('blur', () => {
   if (state === 'play' && !paused) togglePause();
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && state === 'play' && !paused) togglePause();
+  if (document.hidden) {
+    if (state === 'play' && !paused) togglePause();
+    if (actx && actx.state === 'running') actx.suspend();   // hidden tabs go silent
+  } else if (actx && !paused) {
+    actx.resume();
+  }
 });
 
 function pollPad() {
