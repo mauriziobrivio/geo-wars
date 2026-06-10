@@ -75,10 +75,10 @@
     border:1px solid rgba(35,230,255,.3); padding:12px 0; width:300px; font-family:inherit; font-size:15px;
     font-weight:700; letter-spacing:.4em; text-indent:.4em; text-transform:uppercase;
     border-radius:3px; transition:all .15s; text-shadow:0 0 10px rgba(35,230,255,.6); }
-  .mbtn:hover{ background:rgba(35,230,255,.12); border-color:rgba(35,230,255,.85);
+  .mbtn:hover, .mbtn.focus{ background:rgba(35,230,255,.12); border-color:rgba(35,230,255,.85);
     box-shadow:0 0 24px rgba(35,230,255,.3), inset 0 0 18px rgba(35,230,255,.08); transform:translateY(-1px); }
   .mbtn.alt{ color:var(--mag); border-color:rgba(255,61,160,.3); text-shadow:0 0 10px rgba(255,61,160,.6); }
-  .mbtn.alt:hover{ background:rgba(255,61,160,.1); border-color:rgba(255,61,160,.85);
+  .mbtn.alt:hover, .mbtn.alt.focus{ background:rgba(255,61,160,.1); border-color:rgba(255,61,160,.85);
     box-shadow:0 0 24px rgba(255,61,160,.3), inset 0 0 18px rgba(255,61,160,.08); }
 
   /* ---------- high scores ---------- */
@@ -592,7 +592,15 @@ function camUpdate(dt, fx, fy, lookX, lookY) {
 const keys = {};
 const mouse = { x: 0, y: 0, down: false };
 let bombQueued = false, fireHeld = false;
-const pad = { move: { x: 0, y: 0 }, aim: { x: 0, y: 0 }, fire: false, prevB: false, prevP: false, active: false };
+const pad = { move: { x: 0, y: 0 }, aim: { x: 0, y: 0 }, fire: false,
+  prevBomb: false, prevA: false, prevCancel: false, prevP: false,
+  prevUp: false, prevDown: false, prevLeft: false, prevRight: false, active: false };
+let menuIdx = 0;   // 0 = PLAY, 1 = HIGH SCORES on the title menu
+function updateMenuFocus() {
+  const a = document.getElementById('mplay'), b = document.getElementById('mscores');
+  if (a) a.classList.toggle('focus', menuIdx === 0);
+  if (b) b.classList.toggle('focus', menuIdx === 1);
+}
 
 const PREVENT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 
@@ -664,17 +672,74 @@ function pollPad() {
   pad.aim.x = dz(gp.axes[2] || 0);  pad.aim.y = dz(gp.axes[3] || 0);
   if (Math.hypot(pad.aim.x, pad.aim.y) > .3) { pad.fire = true; pad.active = true; }
   if (pad.move.x || pad.move.y) pad.active = true;
-  const b = (gp.buttons[7] && gp.buttons[7].pressed) || (gp.buttons[5] && gp.buttons[5].pressed) ||
-            (gp.buttons[0] && gp.buttons[0].pressed);
-  if (b && !pad.prevB) bombQueued = true;
-  pad.prevB = b;
-  const p = gp.buttons[9] && gp.buttons[9].pressed;
+  const btn = i => gp.buttons[i] && gp.buttons[i].pressed;
+
+  // BOMB in play: shoulders or A; menus consume A as confirm, not bomb
+  const bomb = btn(7) || btn(5) || (state === 'play' && btn(0));
+  if (bomb && !pad.prevBomb && state === 'play') bombQueued = true;
+  pad.prevBomb = bomb;
+
+  // START always = confirm (or pause toggle in play)
+  const p = btn(9);
   if (p && !pad.prevP) {
     initAudio();
     if (state === 'play') togglePause();
     else uiAdvance();
   }
   pad.prevP = p;
+
+  // Menu navigation: D-pad + left stick, rising-edge
+  const up    = btn(12) || pad.move.y < -.55;
+  const down  = btn(13) || pad.move.y >  .55;
+  const left  = btn(14) || pad.move.x < -.55;
+  const right = btn(15) || pad.move.x >  .55;
+  if (state === 'title') {
+    if ((up && !pad.prevUp) || (down && !pad.prevDown)) {
+      menuIdx = menuIdx ? 0 : 1; updateMenuFocus();
+    }
+  } else if (state === 'scores') {
+    if (left && !pad.prevLeft) setScoreTab('local');
+    if (right && !pad.prevRight) setScoreTab('world');
+  } else if (state === 'over' && overReady && overPhase === 'entry') {
+    // arcade tag entry — D-pad/stick navigate slots & cycle A–Z
+    if (left && !pad.prevLeft) { tagPos = Math.max(0, tagPos - 1); renderTag(); }
+    if (right && !pad.prevRight) { tagPos = Math.min(2, tagPos + 1); renderTag(); }
+    if (up && !pad.prevUp) {
+      tagChars[tagPos] = String.fromCharCode((tagChars[tagPos].charCodeAt(0) - 65 + 25) % 26 + 65);
+      renderTag(); SFX.absorb();
+    }
+    if (down && !pad.prevDown) {
+      tagChars[tagPos] = String.fromCharCode((tagChars[tagPos].charCodeAt(0) - 65 + 1) % 26 + 65);
+      renderTag(); SFX.absorb();
+    }
+  }
+  pad.prevUp = up; pad.prevDown = down; pad.prevLeft = left; pad.prevRight = right;
+
+  // A button = confirm (rising-edge, menus only — bomb path already handled in play)
+  const a = btn(0);
+  if (a && !pad.prevA && state !== 'play') {
+    initAudio();
+    if (state === 'title') {
+      if (menuIdx === 0) startGame();
+      else showScores(-1, 'menu');
+    } else if (state === 'scores') {
+      if (scoresFrom === 'over') startGame();
+      else showMenu();
+    } else if (state === 'over' && overReady) {
+      if (overPhase === 'entry') commitTag();
+      else startGame();
+    }
+  }
+  pad.prevA = a;
+
+  // B button = cancel / back
+  const cancel = btn(1);
+  if (cancel && !pad.prevCancel) {
+    if (state === 'scores') showMenu();
+    else if (state === 'over' && overReady && overPhase === 'done') showMenu();
+    else if (state === 'play' || state === 'dying') togglePause();
+  }
+  pad.prevCancel = cancel;
 }
 
 /* ================================================================
@@ -2504,6 +2569,7 @@ function showMenu() {
   P.alive = false;
   musicMood(false);
   EL('titlebest').textContent = topScore() > 0 ? 'BEST — ' + fmt(topScore()) : '';
+  menuIdx = 0; updateMenuFocus();
 }
 function uiAdvance() { // Enter / gamepad-start, per screen
   if (state === 'title') startGame();
@@ -2768,6 +2834,7 @@ EL('tabworld').addEventListener('click', () => { if (state === 'scores') setScor
 if (!storageOK) EL('storagewarn').style.display = '';
 resize();
 updateHUD();
+updateMenuFocus();
 requestAnimationFrame(frame);
 
 /* debug / tinkering hooks */
