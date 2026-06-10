@@ -97,6 +97,12 @@
   #hslist li.empty{ opacity:.26; }
   #hslist li.hl{ background:rgba(35,230,255,.1); border:1px solid rgba(35,230,255,.45); border-radius:3px;
     box-shadow:0 0 18px rgba(35,230,255,.18); }
+  #hstabs{ display:flex; gap:26px; justify-content:center; margin-top:14px; }
+  .hstab{ pointer-events:auto; cursor:pointer; font-size:12px; font-weight:700; letter-spacing:.4em;
+    padding:4px 6px 6px 10px; color:#565e9c; border-bottom:2px solid transparent; transition:all .15s; }
+  .hstab:hover{ color:#aab4ee; }
+  .hstab.on{ color:var(--cyan); border-bottom-color:rgba(35,230,255,.7);
+    text-shadow:0 0 10px rgba(35,230,255,.6); }
 
   /* ---------- initials entry ---------- */
   #entry{ margin-top:22px; }
@@ -182,6 +188,10 @@
 <div class="overlay" id="scores">
   <div class="card">
     <div class="gametitle">HIGH SCORES</div>
+    <div id="hstabs">
+      <span class="hstab on" id="tablocal">LOCAL</span>
+      <span class="hstab" id="tabworld">WORLD</span>
+    </div>
     <ol id="hslist"></ol>
     <div class="prompt" id="scoresprompt">ESC &mdash; BACK</div>
   </div>
@@ -196,7 +206,7 @@
     <div id="entry" style="display:none">
       <div class="entrylabel">&#9733; HIGH SCORE &mdash; ENTER YOUR TAG &#9733;</div>
       <div class="tagbox"><span id="tag0">A</span><span id="tag1">A</span><span id="tag2">A</span></div>
-      <div class="prompt">TYPE A&ndash;Z &nbsp;&middot;&nbsp; ENTER TO SAVE &nbsp;&middot;&nbsp; SCORE IS ALREADY BANKED</div>
+      <div class="prompt">TYPE A&ndash;Z &nbsp;&middot;&nbsp; ENTER SAVES &amp; PUBLISHES TO THE WORLD BOARD</div>
     </div>
     <div class="prompt" id="overprompt">CLICK OR PRESS ENTER TO FLY AGAIN</div>
   </div>
@@ -285,6 +295,60 @@ function hsInsert(entry) {
   return out.indexOf(entry);
 }
 function fmtTime(sec) { const m = (sec / 60) | 0, s2 = (sec % 60) | 0; return m + ':' + ('' + s2).padStart(2, '0'); }
+
+/* ---------------- world leaderboard (Supabase REST, no libraries) ----
+   The publishable key below is safe to ship: row-level security only
+   permits reading scores and inserting constraint-checked rows.       */
+const WORLD_URL = 'https://artypnnxsdovgmsznlbg.supabase.co/rest/v1/geo_wars_scores';
+const WORLD_KEY = 'sb_publishable_q8rUAXLwE04SPpJyADTw2g_cfDFI87B';
+let worldCache = null, worldCacheT = 0, worldStatus = 'idle', lastSubmit = null;
+
+function worldHeaders() {
+  return { apikey: WORLD_KEY, Authorization: 'Bearer ' + WORLD_KEY, 'Content-Type': 'application/json' };
+}
+function timedFetch(url, opts) {
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), 7000);
+  opts = opts || {}; opts.signal = ctrl.signal;
+  return fetch(url, opts).finally(() => clearTimeout(tid));
+}
+async function submitWorldScore(entry) {
+  if (typeof fetch === 'undefined') return;
+  try {
+    lastSubmit = { n: entry.n, s: entry.s };
+    const res = await timedFetch(WORLD_URL, {
+      method: 'POST',
+      headers: Object.assign(worldHeaders(), { Prefer: 'return=minimal' }),
+      body: JSON.stringify({
+        tag: entry.n, score: entry.s, max_mult: entry.m,
+        wave: entry.w || 1, kills: entry.k || 0, run_time: entry.t || 0
+      })
+    });
+    if (!res.ok) throw 0;
+    worldCacheT = 0;   // bust the cache so the board shows the new entry
+    const r2 = await timedFetch(WORLD_URL + '?select=id&score=gt.' + entry.s,
+      { headers: Object.assign(worldHeaders(), { Prefer: 'count=exact', Range: '0-0' }) });
+    const cr = r2.headers.get('content-range');
+    const total = cr ? parseInt(cr.split('/')[1], 10) : NaN;
+    if (!isNaN(total)) showBanner('WORLD RANK #' + fmt(total + 1), '#23e6ff', 2600);
+    if (state === 'scores' && scoreTab === 'world') renderWorld(true);
+  } catch (e) { /* offline — the local board still has it */ }
+}
+async function fetchWorldScores(force) {
+  if (!force && worldCache && performance.now() - worldCacheT < 30000) return worldCache;
+  worldStatus = 'loading';
+  try {
+    const res = await timedFetch(
+      WORLD_URL + '?select=tag,score,max_mult,run_time&order=score.desc,created_at.asc&limit=10',
+      { headers: worldHeaders() });
+    if (!res.ok) throw 0;
+    const rows = await res.json();
+    worldCache = rows.map(r => ({ n: r.tag, s: r.score, m: r.max_mult, t: r.run_time }));
+    worldCacheT = performance.now();
+    worldStatus = 'ok';
+    return worldCache;
+  } catch (e) { worldStatus = 'err'; return null; }
+}
 
 /* ================================================================
    AUDIO — WebAudio synth SFX + a little 124 BPM sequencer.
@@ -547,6 +611,8 @@ window.addEventListener('keydown', e => {
   }
   if (e.code === 'Enter') uiAdvance();
   if (e.code === 'KeyH' && state === 'title') showScores(-1, 'menu');
+  if (state === 'scores' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'KeyT'))
+    setScoreTab(scoreTab === 'local' ? 'world' : 'local');
   if (e.code === 'KeyP' || e.code === 'Escape') {
     if (state === 'scores') showMenu();
     else if (state === 'over' && overReady) showMenu();
@@ -560,7 +626,7 @@ window.addEventListener('keyup', e => {
 window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
 window.addEventListener('mousedown', e => {
   initAudio();
-  if (e.target && e.target.closest && e.target.closest('.mbtn')) return; // menu buttons handle themselves
+  if (e.target && e.target.closest && e.target.closest('.mbtn,.hstab')) return; // buttons/tabs handle themselves
   if (e.button === 0) {
     if (state === 'title') { startGame(); return; }
     if (state === 'scores') { if (scoresFrom === 'over') startGame(); else showMenu(); return; }
@@ -2197,6 +2263,7 @@ function drawEnemy(e) {
    ================================================================ */
 let state = 'title', paused = false, overReady = false;
 let overPhase = 'done', scoresFrom = 'menu', tagChars = ['A', 'A', 'A'], tagPos = 0;
+let scoreTab = 'local', scoresHl = -1;
 let score = 0, best = 0, mult = 1, multLevel = 0, killStreak = 0, totalKills = 0;
 let lives = 3, bombs = 3, nextLifeAt = 200000, nextBombAt = 300000;
 let runTime = 0, maxMult = 1, deathT = 0, overT = 0;
@@ -2332,7 +2399,7 @@ function gameOver() {
   tagPos = 0;
   if (overPhase === 'entry') {
     pendingStamp = Date.now();
-    hsInsert({ n: tag, s: score, m: maxMult, t: Math.round(runTime), k: totalKills, d: pendingStamp });
+    hsInsert({ n: tag, s: score, m: maxMult, t: Math.round(runTime), k: totalKills, w: DIR.wave, d: pendingStamp });
     bestEl.textContent = fmt(Math.max(best, topScore()));
   }
   EL('entry').style.display = overPhase === 'entry' ? '' : 'none';
@@ -2358,35 +2425,65 @@ function commitTag() {
   overPhase = 'done';
   bestEl.textContent = fmt(Math.max(best, topScore()));
   SFX.life();
+  // publish to the world board (fire-and-forget; offline is fine)
+  submitWorldScore(row || { n: n, s: score, m: maxMult, t: Math.round(runTime), k: totalKills, w: DIR.wave });
   showScores(rank, 'over');
 }
 
-function renderScores(hl) {
-  const hs = loadScores();
+function hsRowsHtml(arr, hlIdx, hlMatch) {
   let html = '';
   for (let i = 0; i < 10; i++) {
-    const e2 = hs[i];
+    const e2 = arr[i];
     if (!e2) {
       html += '<li class="empty"><span class="rk">#' + (i + 1) +
         '</span><span class="tag">---</span><span class="sc">&mdash;</span><span class="mu"></span><span class="tm"></span></li>';
       continue;
     }
-    html += '<li' + (i === hl ? ' class="hl"' : '') + '><span class="rk">#' + (i + 1) +
-      '</span><span class="tag">' + e2.n + '</span><span class="sc">' + fmt(e2.s) +
+    const hot = i === hlIdx || (hlMatch && e2.n === hlMatch.n && e2.s === hlMatch.s);
+    html += '<li' + (hot ? ' class="hl"' : '') + '><span class="rk">#' + (i + 1) +
+      '</span><span class="tag">' + ('' + e2.n).replace(/[^A-Z-]/g, '') + '</span><span class="sc">' + fmt(e2.s) +
       '</span><span class="mu">&times;' + (e2.m || 1) + '</span><span class="tm">' + fmtTime(e2.t || 0) + '</span></li>';
   }
-  EL('hslist').innerHTML = html;
+  return html;
+}
+function hsNotice(msg) {
+  return '<li class="empty" style="grid-template-columns:1fr"><span class="tag" style="text-align:center">' + msg + '</span></li>';
+}
+function renderScores(hl) {
+  EL('hslist').innerHTML = hsRowsHtml(loadScores(), hl != null ? hl : -1, null);
+}
+function renderWorld(force) {
+  if (worldCache && !force && worldStatus === 'ok' && performance.now() - worldCacheT < 30000) {
+    EL('hslist').innerHTML = hsRowsHtml(worldCache, -1, lastSubmit);
+    return;
+  }
+  EL('hslist').innerHTML = hsNotice('CONTACTING SATELLITES&hellip;');
+  fetchWorldScores(force).then(rows => {
+    if (state !== 'scores' || scoreTab !== 'world') return;
+    EL('hslist').innerHTML = rows
+      ? hsRowsHtml(rows, -1, lastSubmit)
+      : hsNotice('WORLD BOARD UNREACHABLE — CHECK YOUR CONNECTION');
+  });
+}
+function setScoreTab(t) {
+  scoreTab = t;
+  EL('tablocal').classList.toggle('on', t === 'local');
+  EL('tabworld').classList.toggle('on', t === 'world');
+  if (t === 'local') renderScores(scoresHl);
+  else renderWorld(false);
 }
 function showScores(hl, from) {
-  renderScores(hl != null ? hl : -1);
+  scoresHl = hl != null ? hl : -1;
   scoresFrom = from || 'menu';
   state = 'scores'; tsTarget = 1; paused = false;
   titleEl.classList.remove('on'); overEl.classList.remove('on'); pauseEl.classList.remove('on');
   hudEl.classList.remove('on');
   scoresEl.classList.add('on');
-  EL('scoresprompt').innerHTML = scoresFrom === 'over'
+  setScoreTab(scoreTab);
+  EL('scoresprompt').innerHTML = (scoresFrom === 'over'
     ? 'ENTER &mdash; FLY AGAIN &nbsp;&middot;&nbsp; ESC &mdash; MENU'
-    : 'ENTER / ESC &mdash; BACK';
+    : 'ENTER / ESC &mdash; BACK')
+    + ' &nbsp;&middot;&nbsp; &larr;/&rarr; LOCAL/WORLD';
 }
 function showMenu() {
   state = 'title'; tsTarget = 1; paused = false;
@@ -2653,6 +2750,8 @@ bestEl.textContent = fmt(Math.max(best, topScore()));
 EL('titlebest').textContent = topScore() > 0 ? 'BEST — ' + fmt(topScore()) : '';
 EL('mplay').addEventListener('click', () => { initAudio(); if (state === 'title') startGame(); });
 EL('mscores').addEventListener('click', () => { initAudio(); if (state === 'title') showScores(-1, 'menu'); });
+EL('tablocal').addEventListener('click', () => { if (state === 'scores') setScoreTab('local'); });
+EL('tabworld').addEventListener('click', () => { if (state === 'scores') setScoreTab('world'); });
 if (!storageOK) EL('storagewarn').style.display = '';
 resize();
 updateHUD();
