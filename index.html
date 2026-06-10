@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GEO WARS // VOXEL</title>
+<title>NEONSTORM — A Kontinue? Game</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='6' y='6' width='20' height='20' fill='%2320e0ff' transform='rotate(45 16 16)'/></svg>">
 <style>
   :root{
@@ -169,7 +169,7 @@
 <div id="mutehint">M&nbsp;&middot;&nbsp;AUDIO&nbsp;MUTED</div>
 
 <div class="overlay on" id="title">
-  <div class="sub">A VOXEL-BUILT TRIBUTE TO GEOMETRY WARS</div>
+  <div class="sub">A KONTINUE? GAME</div>
   <div class="menu">
     <button class="mbtn" id="mplay">&#9654;&nbsp;&nbsp;PLAY</button>
     <button class="mbtn alt" id="mscores">&#9670;&nbsp;&nbsp;HIGH SCORES</button>
@@ -222,7 +222,8 @@
 <script>
 'use strict';
 /* ================================================================
-   GEO WARS // VOXEL — a single-file twin-stick arena shooter.
+   NEONSTORM — a single-file voxel twin-stick arena shooter.
+   A Kontinue? Game · https://kontinue.games
    Everything (renderer, physics, audio, music) is hand-rolled.
    Rendering: fake-3D voxel cubes on a tilted parallel projection,
    per-face lambert shading + dynamic lights, additive neon glow.
@@ -1283,7 +1284,10 @@ const FONT = {
   W: ["10001", "10001", "10001", "10101", "10101", "11011", "10001"],
   A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
   R: ["11110", "10001", "10001", "11110", "10100", "10010", "10001"],
-  S: ["01111", "10000", "10000", "01110", "00001", "00001", "11110"]
+  S: ["01111", "10000", "10000", "01110", "00001", "00001", "11110"],
+  N: ["10001", "11001", "10101", "10101", "10101", "10011", "10001"],
+  T: ["11111", "00100", "00100", "00100", "00100", "00100", "00100"],
+  M: ["10001", "11011", "10101", "10101", "10001", "10001", "10001"]
 };
 function buildLogo(text, colors) {
   const letters = [];
@@ -1297,9 +1301,9 @@ function buildLogo(text, colors) {
   }
   return { letters: letters, w: ox - 1 };
 }
-const LOGO = buildLogo('GEO WARS', [
-  hexRGB('#7df4ff'), hexRGB('#4ee7ff'), hexRGB('#2fd4ff'),
-  hexRGB('#ff7ac0'), hexRGB('#ff5cb0'), hexRGB('#ff3da0'), hexRGB('#ff2a92')
+const LOGO = buildLogo('NEONSTORM', [
+  hexRGB('#7df4ff'), hexRGB('#4ee7ff'), hexRGB('#2fd4ff'), hexRGB('#6c8cff'),
+  hexRGB('#9d5cff'), hexRGB('#c14fff'), hexRGB('#ff5cb0'), hexRGB('#ff3da0'), hexRGB('#ff2a92')
 ]);
 
 /* ================================================================
@@ -2579,7 +2583,10 @@ function drawLogoGlow() {
   for (let i = 0; i < LOGO.letters.length; i++) {
     const L = LOGO.letters[i];
     const lx = WORLD_W / 2 + (L.ox + 2.5 - LOGO.w / 2) * 9;
-    drawGlow(lx, WORLD_H / 2 - 36, 0, 70, i < 3 ? [60, 220, 255] : [255, 80, 170], .22);
+    // electric storm: cyan → violet → magenta across the wordmark
+    const tg = i / Math.max(1, LOGO.letters.length - 1);
+    const glow = tg < .45 ? [60, 220, 255] : tg < .65 ? [157, 100, 255] : [255, 80, 170];
+    drawGlow(lx, WORLD_H / 2 - 36, 0, 70, glow, .22);
   }
 }
 

@@ -1,9 +1,8 @@
-# GEO WARS // VOXEL
+# NEONSTORM
 
-A twin-stick arena shooter in a single HTML file — a voxel-built tribute to Geometry Wars.
-No dependencies, no build step, no assets: the renderer, physics, particles, music and SFX are all hand-rolled JavaScript.
+A voxel-built twin-stick arena shooter in a single HTML file. No dependencies, no build step, no assets — the renderer, physics, particles, music and SFX are all hand-rolled JavaScript.
 
-### ▶ [Play it now](https://mauriziobrivio.github.io/geo-wars/)
+### ▶ [Play it now](https://kontinue.games)
 
 ![gameplay](screenshot.jpg)
 
@@ -36,4 +35,4 @@ Download `index.html` and double-click it. That's the whole game.
 
 ---
 
-Built with [Claude Code](https://claude.com/claude-code).
+A **[Kontinue?](https://kontinue.games)** Game · built with [Claude Code](https://claude.com/claude-code).
