@@ -1,38 +1,35 @@
-# NEONSTORM
+# KONTINUE? GAMES
 
-A voxel-built twin-stick arena shooter in a single HTML file. No dependencies, no build step, no assets — the renderer, physics, particles, music and SFX are all hand-rolled JavaScript.
+A tiny browser arcade — voxel-built games you can play instantly, no install. A [Brivio Advisory OÜ](https://github.com/mauriziobrivio) production, made in Estonia.
 
-### ▶ [Play it now](https://kontinue.games)
+### ▶ [Enter the arcade — kontinue.games](https://kontinue.games)
 
-![gameplay](screenshot.jpg)
+![Kontinue? Games](pulsar.jpg)
 
-## Controls
+## Now playing
 
-| Input | Action |
-|---|---|
-| `WASD` / arrows | Move |
-| Mouse | Aim |
-| Hold `LMB` / `Space` | Fire |
-| `RMB` / `Shift` / `B` | Bomb |
-| `P` / `Esc` | Pause |
-| `M` | Mute |
-| Gamepad | Full twin-stick support |
+| Game | Genre | |
+|---|---|---|
+| **[NEONSTORM](https://kontinue.games/neonstorm/)** | Voxel twin-stick shooter | A Geometry Wars tribute — ten enemy types, three escalating bosses, a warping neon grid, and a global leaderboard. |
+| **[PULSAR](https://kontinue.games/pulsar/)** | Rhythm / track shooter | A Frequency/Amplitude tribute — ride five instrument lanes, capture each stem to build the song. Original synth tracks, or drop in your own `.MOD` files. |
 
-## What's inside
+*In development:* Stardust · GlowMaze · Fathom · Contrail.
 
-- **Ten enemy types** — grunts, wanderers, seekers, bullet-dodging weavers, flies, splitters, ricocheting rockets, proximity mines (they chain!), snakes, and gravity wells with genuinely dangerous pull physics.
-- **Three escalating bosses** on a rotating cycle — SERPENT KING, SINGULARITY, HIVE QUEEN — each generation longer / larger / stronger than the last.
-- **Wave director** that escalates continuously: rising population floor, wave bursts every 26 seconds, a boss every 4th wave.
-- **Score multiplier** (×1–×10) that upgrades your guns and resets on death; extra ship at 200k, extra bomb at 300k, +1 bomb per boss kill.
-- **Local top-10 high-score table** with arcade three-letter tags — plus a **global WORLD leaderboard** (Supabase REST via plain `fetch`, still zero libraries) with live world-rank announcements.
-- **Voxel renderer** — every entity is a depth-sorted, per-face-lit stack of cubes on a tilted projection; enemies explode into physical voxel debris that bounces and gets swallowed by black holes.
-- The iconic **warping grid**: a spring-mesh floor that ripples from every bullet, explosion, and gravity well.
-- **Synthesized audio** — a 124 BPM sequencer (kick, hats, bass, arpeggio with sidechain ducking) plus all SFX generated in WebAudio.
+## How it's built
+
+Every game is a **single self-contained HTML file** — the renderer, physics, particles, music and SFX are all hand-rolled JavaScript with zero dependencies and no build step. Each one runs straight from disk or off the web.
+
+```
+index.html        ← the arcade landing page
+neonstorm/        ← NEONSTORM
+pulsar/           ← PULSAR
+CNAME             ← kontinue.games (GitHub Pages)
+```
 
 ## Run locally
 
-Download `index.html` and double-click it. That's the whole game.
+Clone and open `index.html`, or serve the folder with any static server and visit the root.
 
 ---
 
-A **[Kontinue?](https://kontinue.games)** Game · built with [Claude Code](https://claude.com/claude-code).
+© 2026 Kontinue? Games — a Brivio Advisory OÜ production. Made with ♥ and too many voxels, with [Claude Code](https://claude.com/claude-code).
