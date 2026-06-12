@@ -93,13 +93,14 @@
   @keyframes pulse{ 50%{ opacity:.5; } }
 
   /* ---------- game cards ---------- */
-  .cards{ display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+  .cards{ display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:22px; }
   @media (max-width:760px){ .cards{ grid-template-columns:1fr; } }
   .card{ position:relative; display:block; border:3px solid #2a2150; border-radius:12px; overflow:hidden;
     background:#0a0620; transition:transform .16s, box-shadow .16s, border-color .16s; }
   .card:hover{ transform:translateY(-5px) scale(1.012); }
   .card.ns:hover{ border-color:var(--cyan); box-shadow:0 12px 40px rgba(0,0,0,.6), 0 0 40px rgba(35,230,255,.35); }
   .card.pl:hover{ border-color:var(--gold); box-shadow:0 12px 40px rgba(0,0,0,.6), 0 0 40px rgba(255,194,61,.35); }
+  .card.rc:hover{ border-color:#ff7847; box-shadow:0 12px 40px rgba(0,0,0,.6), 0 0 40px rgba(255,120,71,.35); }
   .thumb{ position:relative; aspect-ratio:16/10; background-size:cover; background-position:center;
     border-bottom:3px solid #2a2150; }
   .thumb::after{ /* scanline shimmer over art */
@@ -132,8 +133,12 @@
     border:2px solid; transition:all .14s; }
   .ns .play{ color:var(--cyan); border-color:rgba(35,230,255,.45); }
   .pl .play{ color:var(--gold); border-color:rgba(255,194,61,.45); }
+  .rc .play{ color:#ff7847; border-color:rgba(255,120,71,.45); }
   .card.ns:hover .play{ background:var(--cyan); color:#04121a; box-shadow:0 0 24px rgba(35,230,255,.6); }
   .card.pl:hover .play{ background:var(--gold); color:#1a1204; box-shadow:0 0 24px rgba(255,194,61,.6); }
+  .card.rc:hover .play{ background:#ff7847; color:#1a0a04; box-shadow:0 0 24px rgba(255,120,71,.6); }
+  .rc .cbody h2{ color:#ffe8dc; text-shadow:0 0 18px rgba(255,120,71,.6); }
+  .rc .genre{ color:#ff7847; }
 
   /* ---------- coming soon strip ---------- */
   .soonhead{ text-align:center; margin:40px 0 16px; font-size:12px; letter-spacing:.4em; color:#6b63a0; }
@@ -213,6 +218,21 @@
         <div class="play">INSERT COIN&nbsp;&#9654;</div>
       </div>
     </a>
+
+    <a class="card rc" href="./ricochet/">
+      <div class="thumb" style="background-image:url('ricochet.jpg')">
+        <span class="online"><span class="dot">&#9679;</span> ONLINE</span>
+        <span class="badge">NEW!</span>
+        <span class="shine"></span>
+      </div>
+      <div class="cbody">
+        <h2>RICOCHET</h2>
+        <div class="genre">VOXEL BLOCK-BREAKER</div>
+        <p>Break into the vault, sector by sector. Ten hand-built brick fields, bombs that chain, lasers, multi-ball, and a paddle with a grudge. Classic Arkanoid feel, voxel everything.</p>
+        <div class="meta">DIFFICULTY <b>CLASSIC</b> &nbsp;&middot;&nbsp; 1 PLAYER &nbsp;&middot;&nbsp; 10 SECTORS</div>
+        <div class="play">INSERT COIN&nbsp;&#9654;</div>
+      </div>
+    </a>
   </main>
 
   <section class="hof">
@@ -253,7 +273,7 @@
 'use strict';
 /* ---- ticker (doubled so the -50% loop is seamless) ---- */
 (function(){
-  var msg = '★ WELCOME TO KONTINUE? GAMES ★ <b>2 GAMES ONLINE NOW</b> ★ <i>NEONSTORM</i> — VOXEL TWIN-STICK MAYHEM ★ <i>PULSAR</i> — RIDE THE BEAT ★ MORE COMING SOON ★ NO INSTALL, JUST PLAY ★ ';
+  var msg = '★ WELCOME TO KONTINUE? GAMES ★ <b>3 GAMES ONLINE NOW</b> ★ <i>NEONSTORM</i> — VOXEL TWIN-STICK MAYHEM ★ <i>PULSAR</i> — RIDE THE BEAT ★ <i>RICOCHET</i> — BREAK INTO THE VAULT ★ MORE COMING SOON ★ NO INSTALL, JUST PLAY ★ ';
   document.getElementById('tickertext').innerHTML = msg + msg;
 })();
 
