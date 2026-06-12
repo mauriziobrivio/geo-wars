@@ -32,9 +32,16 @@ ricochet/         ← RICOCHET   (Arkanoid tribute, block-breaker)
 neonstorm.jpg / pulsar.jpg / ricochet.jpg   ← card thumbnails (1000px JPEG)
 CNAME             ← "kontinue.games"
 README.md         ← public readme (§9 below mirrors it — keep both in sync)
+supabase/         ← IaC for the backend: migrations/*.sql + functions/*/index.ts
+                    (suggestion box — deploy via Supabase MCP or `supabase` CLI)
 .claude/serve.js  ← local static server, port 8741, + POST /save for screenshots
 CLAUDE.md         ← this file
 ```
+
+**Mobile/touch:** every game detects a coarse pointer (`matchMedia('(pointer:coarse)')`
+or `ontouchstart`), adds `body.touch`, and shows on-screen controls (`.touchonly`
+elements). Game viewports are zoom-locked (`maximum-scale=1, user-scalable=no`);
+the landing page is **not** (it's a normal scrollable page).
 
 Every game is **one self-contained HTML file, zero dependencies, no build step**.
 Canvas 2D + hand-rolled voxel renderer + WebAudio synthesis. localStorage is
@@ -49,7 +56,12 @@ spending caused the "only 1 enemy ever" bug). Three bosses rotate and scale per
 generation (snake longer/faster/more HP; singularity larger/stronger). Gravity wells:
 inverse-square-ish curve — brutal up close, gentle far. Economy: extra ship 200k,
 extra bomb 300k. Gamepad + rumble, works in menus too. Debug object: `window.GW`
-(bot, spawn, boom, state…). World leaderboard live.
+(bot, spawn, boom, state…). World leaderboard live. **Touch:** dual dynamic virtual
+sticks — left half = move, right half = aim+fire — feeding the same `pad`-equivalent
+path via a separate `touch` object (OR'd into movement/`aimPoint`/fire so `pollPad`'s
+per-frame reset can't clobber it); BOMB + pause buttons; tap-to-cycle tag entry.
+(Watch the TDZ: the touch block runs at module-eval time, *before* `const EL` is
+declared near the bottom — it uses a local `gid()` instead.)
 
 ### PULSAR (`/pulsar/`)
 Rhythm/track shooter. 5 instrument lanes (DRUMS/BASS/LEAD/SYNTH/FX), each with **3
@@ -63,7 +75,10 @@ HORIZON 100 BPM) **plus a built-in ProTracker .MOD engine** (`parseMOD`/`renderM
 lane; chart extracted from note triggers. User sources .MODs from modarchive.org
 (license filter: CC0/CC-BY/commercial-OK only; NC/SA are traps). MOD runs stay on
 LOCAL boards only ('mod:NAME' keys); synth tracks submit to the world board.
-Debug object: `window.PL` (setClock, bot, diff, startMod…).
+Debug object: `window.PL` (setClock, bot, diff, startMod…). **Touch:** bottom bar —
+lane ◀▶ (`move ±1`) + sub-lane hit buttons (`fireCol 0/1/2`), button count synced
+to the difficulty's `cols` via `syncTouchCols()`; touchstart (not click) for low
+latency; canvas center-fire is suppressed when `TOUCH`.
 
 ### RICOCHET (`/ricochet/`)
 Block-breaker. 10 sectors as 13-wide ASCII grids in `LEVELS` (digits 1-7 = colored
@@ -79,8 +94,11 @@ BOTH axes (pure-vertical ping-pong was a real trap). Mouse smoothed (0.78 sens +
 soft follow via `mouseTX`/`usingMouse`); keyboard 620 px/s (user-approved feel).
 Sub-stepped ball physics (no tunneling); paddle-offset deflection ±60°.
 Debug object: `window.RC` (start, bot, skip(n), clearLevel, win, die, drop(type),
-source('world'), stats…). World leaderboard live. Open: more sectors / difficulty
-tiers / feel-tuning per user playtests.
+source('world'), stats…). World leaderboard live. **Touch:** drag anywhere to move
+the paddle (absolute: `mouseTX = (touchX-ax)/sc`, finger under the paddle — no 0.78
+bias), tap to launch/fire laser (`fire()`), tap to resume from pause; pause button +
+tap-to-cycle tag entry. Open: more sectors / difficulty tiers / feel-tuning per user
+playtests (touch feel included).
 
 ### Landing page (`index.html`)
 90s/2000s web aesthetic: cabinet marquee, CRT scanlines, starfield, LCD visitor
@@ -88,16 +106,21 @@ counter, webring, ticker ("3 GAMES ONLINE NOW"), 3-up auto-fit card grid, coming
 soon strip, the **HALL OF FAME marquee** (`#hoftext`) — fetches top-3 from all
 three score tables via anon REST, doubled-content -50% CSS loop, graceful "BE THE
 FIRST" when a board is empty — and the **TIP JAR coin door** (`.coindoor`, above
-the footer). When adding a game: new card (`.card.xx` hover color variants),
-thumbnail jpg at root, ticker text, Hall of Fame fetch + `seg()` call, an exit
-pill *inside the game* (`#exit`, shown when HUD is off) and a tip pill (`#tip`,
-same visibility, top-right, in the mousedown guard).
+the footer) — and the **SUGGESTION BOX** (`.suggest`, between the coming-soon strip
+and the coin door): a moderated community idea box. Submit form (optional 3-letter
+tag + category + 280-char idea) POSTs to the `submit-suggestion` edge function;
+right pane shows the **curated feed** (anon REST, `approved=eq.true` only —
+graceful "jar's empty" state). New suggestions land hidden; you flip `approved`
+(and optionally `pinned`) on the good ones for them to appear. When adding a game:
+new card (`.card.xx` hover color variants), thumbnail jpg at root, ticker text, Hall
+of Fame fetch + `seg()` call, an exit pill *inside the game* (`#exit`, shown when HUD
+is off) and a tip pill (`#tip`, same visibility, top-right, in the mousedown guard).
 
 ### Tip jar
 Stripe Payment Link on the Brivio Advisory Stripe account (`acct_1RoUjSHMdwHMd3yH`),
-"customers choose what to pay". The same `buy.stripe.com` URL appears **4×**:
-landing `.coinslot` + the `#tip` pill in each game — swap all with one sed over
-`grep -rl 'buy.stripe.com'`. **Copy rule:** "INSERT COIN" always means *play*
+"customers choose what to pay". Live link: `https://buy.stripe.com/fZubJ1bAfb1q1WF52l2Ry05`.
+The same `buy.stripe.com` URL appears **4×**: landing `.coinslot` + the `#tip` pill
+in each game — swap all with one sed over `grep -rl 'buy.stripe.com'`. **Copy rule:** "INSERT COIN" always means *play*
 (card buttons, select header, HOF empty states) — money UI says **TIP JAR**;
 never reuse INSERT COIN for payments. Tip pills are mouse/click-only (deliberate:
 an outbound link has no business on the gamepad path).
@@ -112,9 +135,25 @@ old schema was cleaned). Pattern per game (authless arcade boards, hardened):
 | NEONSTORM | `geo_wars_scores` | `submit-score` |
 | PULSAR | `pulsar_scores` | `submit-pulsar-score` |
 | RICOCHET | `ricochet_scores` | `submit-ricochet-score` |
+| Suggestion box | `suggestions` (SELECT **`approved=true` only**) | `submit-suggestion` |
 
 Plus per-game `*_submissions` rate-limit ledgers (RLS deny-all: enabled, no
 policies — the "RLS Enabled No Policy" advisor INFO on them is **intentional**).
+`suggestion_submissions` is the same kind of ledger.
+
+**Suggestion box** (community ideas, same hardening as the score boards): the
+`submit-suggestion` fn validates an optional 3-letter tag, a whitelisted category
+(GAME/FEATURE/FIX/OTHER) and a 4–280-char body, sha256 per-IP rate-limits (8/hr),
+and inserts with `approved=false`. The public feed RLS only exposes approved rows,
+so **nothing user-typed shows on the site until Maurizio flips `approved`** (and
+optionally `pinned`) via the dashboard/MCP — moderate before it's visible. SQL +
+function live in `supabase/` (the rest were deployed straight through MCP and never
+checked in; these are checked in because they were authored without MCP access).
+**Still to deploy** (needs Supabase auth this session lacked): `apply_migration`
+the SQL + `deploy_edge_function submit-suggestion --no-verify-jwt`, then adversarially
+test (forged direct insert must bounce; over-length/bad-category must 400) and scrub
+test rows. Until deployed, the box degrades gracefully (feed shows "jar's empty",
+submit shows a friendly retry message).
 
 Edge functions: shape validation (3-letter A-Z tag), plausibility ceilings
 (Ricochet: score ≤ 2M, sectors 1-10, combo ≤ 400; Pulsar: per-diff score ceilings,
@@ -174,6 +213,16 @@ tools (`apply_migration`, `deploy_edge_function`, `execute_sql`, `get_advisors`)
    mousedown-fires handler.
 10. Adversarially test score gates after deploying them (forged direct insert,
     over-ceiling values, bad shapes) and clean up the test rows.
+11. **Touch buttons are mutually exclusive with the `closest()` guard.** Add every
+    new on-screen control class (`.tbtn,.tlane,.thit`, tag slots) to the global
+    mousedown/touch guard so a tap doesn't *also* fire the canvas action underneath.
+    Use `touchstart` (not click) for gameplay hits — clicks carry latency. `e.preventDefault()`
+    on gameplay touches to kill synthetic mouse + scroll/zoom; **don't** preventDefault
+    on menu taps (let synthetic clicks reach the DOM buttons).
+12. **`const` helpers live in the TDZ until their line runs.** A block that executes
+    at module-eval time (e.g. NEONSTORM's touch setup near the top) can't call `EL`
+    if `const EL` is declared 1700 lines below — define a local `gid()` or move the
+    block. A clean console at *load* (not just in-play) is the test that catches this.
 
 ## 7. Engine conventions (shared across games)
 
@@ -196,7 +245,12 @@ Next in catalog (names settled): **Stardust** (Lumines), **GlowMaze** (Pac-Man C
 Backlog (names TBD): Bomberman→*Fuze?*, N+→*Vault?*, Castle Crashers→*Rampart?*
 (the big one — flag scope before starting). Pulsar wants: more original tracks,
 XM/IT support, surfacing MOD-run local boards. Ricochet wants: user feel-feedback,
-maybe more sectors. Monetization: tip jar **live** (§3); portals still parked.
+maybe more sectors. Monetization: tip jar **live** (§3, real Stripe link in);
+portals still parked. Community **suggestion box live** on the landing page (§3) —
+watch it for incoming ideas and feed the catalog from real player requests.
+**Mobile/touch shipped** across all three games (§2) — collect feel-feedback on the
+control schemes (twin-stick sticks, rhythm hit-bar, paddle drag) like any other
+playtest.
 
 ## 9. README.md (public copy — keep in sync with the repo file)
 
@@ -223,6 +277,10 @@ maybe more sectors. Monetization: tip jar **live** (§3); portals still parked.
 > particles, music and SFX are all hand-rolled JavaScript with zero dependencies
 > and no build step. Each one runs straight from disk or off the web.
 >
+> Play anywhere: keyboard, mouse, and gamepad on desktop — and **full touch
+> controls on phones and tablets** (twin-stick pads for NEONSTORM, a hit-bar for
+> PULSAR, drag-the-paddle for RICOCHET).
+>
 > ```
 > index.html        ← the arcade landing page
 > neonstorm/        ← NEONSTORM
@@ -235,6 +293,12 @@ maybe more sectors. Monetization: tip jar **live** (§3); portals still parked.
 >
 > Clone and open `index.html`, or serve the folder with any static server and
 > visit the root.
+>
+> ## Suggest a game
+>
+> Got an idea for the next tribute, or a feature you'd love? There's a **suggestion
+> box** on the landing page — drop it in. The best ideas get pinned up for everyone
+> to see.
 >
 > ## Tip jar
 >

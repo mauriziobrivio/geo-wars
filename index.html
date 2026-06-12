@@ -173,6 +173,50 @@
   .mini .soonlbl{ margin-top:10px; display:inline-block; font-size:9px; letter-spacing:.22em; color:var(--gold);
     border:1px solid rgba(255,194,61,.3); border-radius:3px; padding:2px 6px; }
 
+  /* ---------- suggestion box (community ideas) ---------- */
+  .suggest{ margin:40px 0 4px; border:3px solid #2a2150; border-radius:12px; overflow:hidden;
+    background:linear-gradient(180deg,#0c0726,#080418);
+    box-shadow:inset 0 0 30px rgba(0,0,0,.55), 0 0 30px rgba(183,140,255,.09); }
+  .sgtitle{ text-align:center; padding:11px 12px; font-size:12px; letter-spacing:.3em; padding-left:.3em;
+    color:var(--vio); text-shadow:0 0 12px rgba(183,140,255,.6); border-bottom:2px solid #2a2150;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px); }
+  .sgbody{ display:grid; grid-template-columns:1.05fr .95fr; gap:0; }
+  @media (max-width:680px){ .sgbody{ grid-template-columns:1fr; } }
+  .sgform{ padding:16px 16px 18px; display:flex; flex-direction:column; gap:10px;
+    border-right:2px solid #2a2150; }
+  @media (max-width:680px){ .sgform{ border-right:0; border-bottom:2px solid #2a2150; } }
+  .sgrow{ display:flex; gap:10px; }
+  .sgtag, .sgcat, .sgtext{ font-family:inherit; color:var(--ink); background:#05030f;
+    border:2px solid #2a2150; border-radius:6px; padding:9px 10px; font-size:12.5px;
+    box-shadow:inset 0 0 12px rgba(0,0,0,.6); outline:none; transition:border-color .16s, box-shadow .16s; }
+  .sgtag:focus, .sgcat:focus, .sgtext:focus{ border-color:#4a3d80; box-shadow:inset 0 0 12px rgba(0,0,0,.6), 0 0 14px rgba(183,140,255,.25); }
+  .sgtag{ width:74px; text-align:center; letter-spacing:.3em; text-transform:uppercase; color:var(--cyan); font-weight:800; }
+  .sgcat{ flex:1; letter-spacing:.12em; cursor:pointer; -webkit-appearance:none; appearance:none;
+    background-image:linear-gradient(45deg,transparent 50%,var(--vio) 50%),linear-gradient(135deg,var(--vio) 50%,transparent 50%);
+    background-position:calc(100% - 16px) 16px,calc(100% - 11px) 16px; background-size:5px 5px,5px 5px; background-repeat:no-repeat; }
+  .sgcat option{ background:#0c0726; }
+  .sgtext{ width:100%; resize:none; line-height:1.55; }
+  .sgtext::placeholder{ color:#5a5390; }
+  .sgfoot{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .sgcount{ font-size:10px; letter-spacing:.16em; color:#605990; }
+  .sgcount.warn{ color:var(--mag); }
+  .sgbtn{ font-family:inherit; font-size:12px; font-weight:800; letter-spacing:.22em; cursor:pointer;
+    color:var(--vio); background:#0a0620; border:2px solid rgba(183,140,255,.45); border-radius:6px;
+    padding:10px 16px; transition:all .14s; }
+  .sgbtn:hover:not(:disabled){ background:var(--vio); color:#160a2a; box-shadow:0 0 22px rgba(183,140,255,.55); }
+  .sgbtn:disabled{ opacity:.5; cursor:default; }
+  .sgmsg{ min-height:14px; font-size:11px; letter-spacing:.1em; }
+  .sgmsg.ok{ color:var(--grn); text-shadow:0 0 8px rgba(82,255,90,.4); }
+  .sgmsg.err{ color:var(--mag); }
+  .sgfeedwrap{ padding:14px 16px 16px; min-width:0; }
+  .sgfeedlbl{ font-size:10px; letter-spacing:.28em; color:var(--gold); text-shadow:0 0 8px rgba(255,194,61,.4); margin-bottom:9px; }
+  .sgfeed{ display:flex; flex-direction:column; gap:9px; max-height:188px; overflow:hidden; }
+  .sgitem{ font-size:11.5px; line-height:1.5; color:#c8c2f0; }
+  .sgitem .sgwho{ color:var(--cyan); font-weight:800; }
+  .sgitem .sgcatt{ color:#7a72b8; font-style:normal; font-size:9.5px; letter-spacing:.12em;
+    border:1px solid #2a2150; border-radius:3px; padding:1px 5px; margin-right:6px; }
+  .sgempty{ font-size:11px; letter-spacing:.08em; color:#605990; line-height:1.6; }
+
   /* ---------- footer (web 1.0) ---------- */
   footer{ margin-top:46px; padding-top:22px; border-top:2px solid #1c1640; text-align:center; }
   .counter{ display:inline-flex; gap:3px; padding:6px 8px; background:#000; border:2px solid #2a2150; border-radius:5px;
@@ -268,6 +312,34 @@
     <div class="mini"><span class="lock">&#128274;</span><b>CONTRAIL</b><small>LIGHT-TRAIL RACER</small><span class="soonlbl">SOON</span></div>
   </div>
 
+  <section class="suggest" id="suggest">
+    <div class="sgtitle">&#9998;&nbsp; SUGGESTION BOX &mdash; WHAT SHOULD WE BUILD NEXT?</div>
+    <div class="sgbody">
+      <form class="sgform" id="sgform" autocomplete="off">
+        <div class="sgrow">
+          <input class="sgtag" id="sgtag" maxlength="3" placeholder="TAG" aria-label="Your 3-letter tag (optional)" inputmode="latin" autocomplete="off">
+          <select class="sgcat" id="sgcat" aria-label="Category">
+            <option value="GAME">GAME IDEA</option>
+            <option value="FEATURE">FEATURE</option>
+            <option value="FIX">BUG / FIX</option>
+            <option value="OTHER">OTHER</option>
+          </select>
+        </div>
+        <textarea class="sgtext" id="sgtext" maxlength="280" rows="2"
+          placeholder="A Bomberman tribute&hellip; online co-op&hellip; a new PULSAR track&hellip; type your idea" aria-label="Your suggestion"></textarea>
+        <div class="sgfoot">
+          <span class="sgcount" id="sgcount">280</span>
+          <button type="submit" class="sgbtn" id="sgbtn">DROP IT IN&nbsp;&#9656;</button>
+        </div>
+        <div class="sgmsg" id="sgmsg" role="status" aria-live="polite"></div>
+      </form>
+      <div class="sgfeedwrap">
+        <div class="sgfeedlbl">&#9733;&nbsp; FRESH FROM THE JAR</div>
+        <div class="sgfeed" id="sgfeed"><div class="sgempty">Loading ideas&hellip;</div></div>
+      </div>
+    </div>
+  </section>
+
   <section class="coindoor">
     <a class="coinslot" href="https://buy.stripe.com/fZubJ1bAfb1q1WF52l2Ry05" target="_blank" rel="noopener" aria-label="Leave a tip — secure Stripe checkout">
       <span class="slotplate"><span class="slit"></span></span>
@@ -301,7 +373,7 @@
 'use strict';
 /* ---- ticker (doubled so the -50% loop is seamless) ---- */
 (function(){
-  var msg = '★ WELCOME TO KONTINUE? GAMES ★ <b>3 GAMES ONLINE NOW</b> ★ <i>NEONSTORM</i> — VOXEL TWIN-STICK MAYHEM ★ <i>PULSAR</i> — RIDE THE BEAT ★ <i>RICOCHET</i> — BREAK INTO THE VAULT ★ MORE COMING SOON ★ NO INSTALL, JUST PLAY ★ SPARE A COIN? — <b>TIPS KEEP THE NEON ON</b> ★ ';
+  var msg = '★ WELCOME TO KONTINUE? GAMES ★ <b>3 GAMES ONLINE NOW</b> ★ <i>NEONSTORM</i> — VOXEL TWIN-STICK MAYHEM ★ <i>PULSAR</i> — RIDE THE BEAT ★ <i>RICOCHET</i> — BREAK INTO THE VAULT ★ MORE COMING SOON ★ NO INSTALL, JUST PLAY ★ <b>GOT AN IDEA? DROP IT IN THE SUGGESTION BOX</b> ★ SPARE A COIN? — <b>TIPS KEEP THE NEON ON</b> ★ ';
   document.getElementById('tickertext').innerHTML = msg + msg;
 })();
 
@@ -395,6 +467,82 @@ function ring(dir){
     }
   }
   addEventListener('resize', resize); resize(); requestAnimationFrame(frame);
+})();
+
+/* ---- SUGGESTION BOX: submit ideas + show the curated (approved) feed ---- */
+(function(){
+  var BASE = 'https://artypnnxsdovgmsznlbg.supabase.co/';
+  var KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFydHlwbm54c2Rvdmdtc3pubGJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNjc1NTQsImV4cCI6MjA5MDY0MzU1NH0.daE4ZNhyIM22l3tAR6EeQVcmDT8QEuDlosoPzgXiEkQ';
+  var H = { apikey: KEY, Authorization: 'Bearer ' + KEY };
+  var form = document.getElementById('sgform'), txt = document.getElementById('sgtext'),
+      tag = document.getElementById('sgtag'), cat = document.getElementById('sgcat'),
+      btn = document.getElementById('sgbtn'), msg = document.getElementById('sgmsg'),
+      count = document.getElementById('sgcount'), feed = document.getElementById('sgfeed');
+
+  function esc(s){ return String(s).replace(/[&<>"']/g, function(c){
+    return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); }
+
+  /* char counter */
+  function tick(){ var r = 280 - txt.value.length; count.textContent = r;
+    count.classList.toggle('warn', r <= 30); }
+  txt.addEventListener('input', tick);
+  tag.addEventListener('input', function(){ tag.value = tag.value.toUpperCase().replace(/[^A-Z]/g,''); });
+
+  /* curated feed (approved only — RLS enforces it) */
+  function loadFeed(){
+    var ctrl = new AbortController(), tid = setTimeout(function(){ ctrl.abort(); }, 7000);
+    fetch(BASE + 'rest/v1/suggestions?select=tag,category,body&approved=eq.true&order=pinned.desc,created_at.desc&limit=6',
+      { headers: H, signal: ctrl.signal })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .catch(function(){ return null; })
+      .finally(function(){ clearTimeout(tid); })
+      .then(function(rows){
+        if (!rows || !rows.length){
+          feed.innerHTML = '<div class="sgempty">The jar’s empty &mdash; be the first to drop an idea in.' +
+            ' Best ones get pinned up here.</div>';
+          return;
+        }
+        feed.innerHTML = rows.map(function(s){
+          var who = (s.tag ? '<span class="sgwho">' + esc(s.tag) + '</span> ' : '');
+          return '<div class="sgitem"><span class="sgcatt">' + esc(s.category || 'GAME') + '</span>' +
+            who + esc(s.body) + '</div>';
+        }).join('');
+      });
+  }
+  loadFeed();
+
+  /* submit */
+  var busy = false;
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    if (busy) return;
+    var body = txt.value.trim().replace(/\s+/g, ' ');
+    if (body.length < 4){ msg.className = 'sgmsg err'; msg.textContent = 'Add a few more words first.'; return; }
+    busy = true; btn.disabled = true; msg.className = 'sgmsg'; msg.textContent = 'Dropping it in…';
+    var ctrl = new AbortController(), tid = setTimeout(function(){ ctrl.abort(); }, 9000);
+    fetch(BASE + 'functions/v1/submit-suggestion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: 'Bearer ' + KEY },
+      body: JSON.stringify({ tag: tag.value || null, category: cat.value, body: body }),
+      signal: ctrl.signal
+    })
+      .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
+      .then(function(res){
+        if (res.ok && res.j && res.j.ok){
+          msg.className = 'sgmsg ok';
+          msg.textContent = '★ IN THE JAR — we read every one. Thanks!';
+          txt.value = ''; tag.value = ''; tick();
+        } else {
+          msg.className = 'sgmsg err';
+          msg.textContent = (res.j && res.j.error) ? res.j.error : 'Hmm, that didn’t go through — try again.';
+        }
+      })
+      .catch(function(){
+        msg.className = 'sgmsg err';
+        msg.textContent = 'Couldn’t reach the jar — check your connection and try again.';
+      })
+      .finally(function(){ clearTimeout(tid); busy = false; btn.disabled = false; });
+  });
 })();
 </script>
 </body>

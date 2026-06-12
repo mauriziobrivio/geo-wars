@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>NEONSTORM — A Kontinue? Game</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='6' y='6' width='20' height='20' fill='%2320e0ff' transform='rotate(45 16 16)'/></svg>">
 <style>
@@ -156,12 +156,44 @@
     border-radius:3px; overflow:hidden; box-shadow:0 0 14px rgba(255,64,64,.25); }
   #bosshp i{ display:block; height:100%; width:100%; background:linear-gradient(90deg,#ff3030,#ff9040);
     box-shadow:0 0 10px rgba(255,80,40,.9); transition:width .2s; }
+
+  /* ---------- touch controls (mobile twin-stick) ---------- */
+  html, body{ touch-action:none; overscroll-behavior:none; }
+  body{ -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; }
+  body.touch{ position:fixed; inset:0; width:100%; height:100%; overflow:hidden; }
+  #cv{ touch-action:none; }
+  .tjoy{ position:fixed; z-index:34; width:128px; height:128px; margin:-64px 0 0 -64px; border-radius:50%;
+    border:2px solid rgba(125,134,200,.3); background:radial-gradient(circle, rgba(20,16,48,.45), rgba(8,6,26,.22));
+    pointer-events:none; opacity:0; transition:opacity .12s; }
+  .tjoy.on{ opacity:.92; }
+  .tjoy.aim{ border-color:rgba(255,110,150,.42); }
+  .tjoy i{ position:absolute; left:50%; top:50%; width:56px; height:56px; margin:-28px 0 0 -28px; border-radius:50%;
+    background:radial-gradient(circle at 38% 34%, rgba(120,210,255,.92), rgba(35,150,210,.5));
+    box-shadow:0 0 18px rgba(35,230,255,.5); }
+  .tjoy.aim i{ background:radial-gradient(circle at 38% 34%, rgba(255,150,180,.95), rgba(220,60,110,.55));
+    box-shadow:0 0 18px rgba(255,80,140,.5); }
+  .tbtn{ position:fixed; z-index:36; font-family:inherit; font-weight:800; letter-spacing:.1em;
+    color:#dfe7ff; border:2px solid rgba(125,134,200,.4); background:rgba(10,8,30,.5);
+    border-radius:50%; display:none; align-items:center; justify-content:center;
+    -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+  body.touch #tbomb.show, body.touch #tpause.show{ display:flex; }
+  #tbomb{ width:80px; height:80px; left:calc(50% - 40px); bottom:24px; font-size:12px; color:#ffd27a;
+    border-color:rgba(255,179,0,.5); text-shadow:0 0 10px rgba(255,179,0,.6); }
+  #tbomb:active{ background:rgba(255,179,0,.26); }
+  #tpause{ width:46px; height:46px; top:14px; right:16px; font-size:13px; }
+  #tpause:active{ background:rgba(35,230,255,.22); }
+  .touchonly{ display:none; } body.touch .touchonly{ display:block; }
 </style>
 </head>
 <body>
 <canvas id="cv"></canvas>
 <a id="exit" href="../" title="Back to the arcade">&#9664;&nbsp;ARCADE</a>
 <a id="tip" href="https://buy.stripe.com/fZubJ1bAfb1q1WF52l2Ry05" target="_blank" rel="noopener" title="Enjoying it? Tips keep the arcade running">&#9673;&nbsp;TIP JAR</a>
+
+<div class="tjoy" id="tjoyL"><i></i></div>
+<div class="tjoy aim" id="tjoyR"><i></i></div>
+<button class="tbtn" id="tpause" aria-label="Pause">&#10073;&#10073;</button>
+<button class="tbtn" id="tbomb" aria-label="Bomb">BOMB</button>
 
 <div id="hud">
   <div class="hudcorner" id="tl">
@@ -206,6 +238,7 @@
   </div>
   <div class="besttag" id="titlebest"></div>
   <div class="foot">ENTER PLAY &nbsp;&middot;&nbsp; H SCORES &nbsp;&middot;&nbsp; P PAUSE &nbsp;&middot;&nbsp; M MUTE &nbsp;&middot;&nbsp; TWIN-STICK GAMEPAD SUPPORTED</div>
+  <div class="foot touchonly" style="color:#7df4ff">&#9776; TOUCH &mdash; LEFT PAD MOVES &middot; RIGHT PAD AIMS &amp; FIRES &middot; BOMB BUTTON</div>
   <div class="foot" id="storagewarn" style="display:none;color:#ff7a6a">&#9888; BROWSER STORAGE UNAVAILABLE &mdash; SCORES WON'T PERSIST AFTER CLOSING</div>
 </div>
 
@@ -231,6 +264,10 @@
       <div class="entrylabel">&#9733; HIGH SCORE &mdash; ENTER YOUR TAG &#9733;</div>
       <div class="tagbox"><span id="tag0">A</span><span id="tag1">A</span><span id="tag2">A</span></div>
       <div class="prompt">TYPE A&ndash;Z &nbsp;&middot;&nbsp; ENTER SAVES &amp; PUBLISHES TO THE WORLD BOARD</div>
+      <div class="touchonly" style="margin-top:10px">
+        <div class="prompt">TAP A LETTER TO CHANGE IT</div>
+        <a class="exitbtn" id="tagsave" style="margin-top:10px">SAVE TAG &#9656;</a>
+      </div>
     </div>
     <div class="prompt" id="overprompt">CLICK OR PRESS ENTER TO FLY AGAIN</div>
   </div>
@@ -765,6 +802,81 @@ function pollPad() {
     else if (state === 'play' || state === 'dying') togglePause();
   }
   pad.prevCancel = cancel;
+}
+
+/* ================================================================
+   TOUCH — dual virtual sticks (left = move, right = aim+fire),
+   feeds the same path as keyboard/gamepad. Bomb + pause buttons.
+   ================================================================ */
+const touch = { moveX: 0, moveY: 0, aimX: 0, aimY: 0, aimOn: false, fire: false };
+const TOUCH = matchMedia('(pointer:coarse)').matches || ('ontouchstart' in window);
+const JOY_R = 56;
+const gid = id => document.getElementById(id);   // EL() is declared further down (TDZ), so use this here
+let _moveId = null, _aimId = null, _moOx = 0, _moOy = 0, _aOx = 0, _aOy = 0;
+const tjL = gid('tjoyL'), tjR = gid('tjoyR'), tbombEl = gid('tbomb'), tpauseEl = gid('tpause');
+function setJoy(el, on, ox, oy, dx, dy) {
+  el.classList.toggle('on', on);
+  if (on) { el.style.left = ox + 'px'; el.style.top = oy + 'px';
+    el.firstChild.style.transform = 'translate(' + dx + 'px,' + dy + 'px)'; }
+}
+function tStart(e) {
+  if (state !== 'play' || paused) return;   // menus: let DOM buttons + synthetic mouse handle it
+  let acted = false;
+  for (let i = 0; i < e.changedTouches.length; i++) {   // TouchList: index, never for..of (not iterable on Safari)
+    const t = e.changedTouches[i];
+    if (t.target && t.target.closest && t.target.closest('.tbtn,.mbtn,.hstab,.exitbtn,#exit,#tip')) continue;
+    if (t.clientX < innerWidth * 0.5) {
+      if (_moveId === null) { _moveId = t.identifier; _moOx = t.clientX; _moOy = t.clientY; setJoy(tjL, true, _moOx, _moOy, 0, 0); acted = true; }
+    } else if (_aimId === null) {
+      _aimId = t.identifier; _aOx = t.clientX; _aOy = t.clientY; touch.aimOn = true; setJoy(tjR, true, _aOx, _aOy, 0, 0); acted = true;
+    }
+  }
+  if (acted) e.preventDefault();
+}
+function tMove(e) {
+  if (state !== 'play' || paused) return;
+  let acted = false;
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    const t = e.changedTouches[i];
+    if (t.identifier === _moveId) {
+      let dx = t.clientX - _moOx, dy = t.clientY - _moOy, m = Math.hypot(dx, dy);
+      if (m > JOY_R) { dx *= JOY_R / m; dy *= JOY_R / m; }
+      touch.moveX = dx / JOY_R; touch.moveY = dy / JOY_R; setJoy(tjL, true, _moOx, _moOy, dx, dy); acted = true;
+    } else if (t.identifier === _aimId) {
+      let dx = t.clientX - _aOx, dy = t.clientY - _aOy, m = Math.hypot(dx, dy);
+      if (m > JOY_R) { dx *= JOY_R / m; dy *= JOY_R / m; }
+      touch.aimX = dx / JOY_R; touch.aimY = dy / JOY_R; touch.fire = (m > 9); setJoy(tjR, true, _aOx, _aOy, dx, dy); acted = true;
+    }
+  }
+  if (acted) e.preventDefault();
+}
+function tEnd(e) {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    const t = e.changedTouches[i];
+    if (t.identifier === _moveId) { _moveId = null; touch.moveX = 0; touch.moveY = 0; setJoy(tjL, false); }
+    else if (t.identifier === _aimId) { _aimId = null; touch.aimX = 0; touch.aimY = 0; touch.aimOn = false; touch.fire = false; setJoy(tjR, false); }
+  }
+}
+if (TOUCH) {
+  document.body.classList.add('touch');
+  addEventListener('touchstart', tStart, { passive: false });
+  addEventListener('touchmove', tMove, { passive: false });
+  addEventListener('touchend', tEnd, { passive: false });
+  addEventListener('touchcancel', tEnd, { passive: false });
+  tbombEl.addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); initAudio(); if (state === 'play' && !paused) bombQueued = true; }, { passive: false });
+  tpauseEl.addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); if (state === 'play') togglePause(); }, { passive: false });
+  // touch arcade-tag entry: tap a slot to cycle its letter, SAVE commits
+  ['tag0', 'tag1', 'tag2'].forEach((id, i) => {
+    const el = gid(id); if (!el) return;
+    el.addEventListener('click', () => {
+      if (state === 'over' && overReady && overPhase === 'entry') {
+        tagPos = i; tagChars[i] = String.fromCharCode((tagChars[i].charCodeAt(0) - 65 + 1) % 26 + 65);
+        renderTag(); SFX.absorb();
+      }
+    });
+  });
+  const ts = gid('tagsave');
+  if (ts) ts.addEventListener('click', e => { e.preventDefault(); if (state === 'over' && overReady && overPhase === 'entry') commitTag(); });
 }
 
 /* ================================================================
@@ -1573,6 +1685,8 @@ function resetPlayer() {
 }
 
 function aimPoint() {
+  if (touch.aimOn && (touch.aimX || touch.aimY))
+    return { x: P.x + touch.aimX * 240, y: P.y + touch.aimY * 240 };
   if (pad.active && (pad.aim.x || pad.aim.y))
     return { x: P.x + pad.aim.x * 240, y: P.y + pad.aim.y * 240 };
   return { x: s2wX(mouse.x), y: s2wY(mouse.y) };
@@ -1580,8 +1694,8 @@ function aimPoint() {
 
 function playerUpdate(dt) {
   if (!P.alive) return;
-  let ix = ((keys.KeyA || keys.ArrowLeft) ? -1 : 0) + ((keys.KeyD || keys.ArrowRight) ? 1 : 0) + pad.move.x;
-  let iy = ((keys.KeyW || keys.ArrowUp) ? -1 : 0) + ((keys.KeyS || keys.ArrowDown) ? 1 : 0) + pad.move.y;
+  let ix = ((keys.KeyA || keys.ArrowLeft) ? -1 : 0) + ((keys.KeyD || keys.ArrowRight) ? 1 : 0) + pad.move.x + touch.moveX;
+  let iy = ((keys.KeyW || keys.ArrowUp) ? -1 : 0) + ((keys.KeyS || keys.ArrowDown) ? 1 : 0) + pad.move.y + touch.moveY;
   const im = Math.hypot(ix, iy);
   if (im > 1) { ix /= im; iy /= im; }
   P.vx += ix * 2500 * dt; P.vy += iy * 2500 * dt;
@@ -1610,7 +1724,7 @@ function playerUpdate(dt) {
 
   // fire
   P.fireCd -= dt;
-  if ((mouse.down || fireHeld || pad.fire) && P.fireCd <= 0) fireGuns();
+  if ((mouse.down || fireHeld || pad.fire || touch.fire) && P.fireCd <= 0) fireGuns();
 }
 
 function fireGuns() {
@@ -2839,6 +2953,12 @@ function frame(ts) {
   const pillsOn = !hudEl.classList.contains('on');
   exitEl.classList.toggle('show', pillsOn);
   tipEl.classList.toggle('show', pillsOn);
+  // touch action buttons: only while actively playing
+  if (TOUCH) {
+    const showT = state === 'play' && !paused;
+    tbombEl.classList.toggle('show', showT);
+    tpauseEl.classList.toggle('show', showT);
+  }
 
   // silent auto-quality
   const ms = dtR * 1000;

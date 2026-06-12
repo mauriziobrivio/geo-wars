@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>PULSAR — A Kontinue? Game</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='6' fill='%23ffb300'/><rect x='15' y='2' width='2' height='9' fill='%23b78cff'/><rect x='15' y='21' width='2' height='9' fill='%23b78cff'/></svg>">
 <style>
@@ -158,6 +158,25 @@
     background:rgba(6,3,15,.82); color:var(--gold); font-size:22px; font-weight:700; letter-spacing:.4em;
     padding-left:.4em; text-shadow:0 0 18px rgba(255,194,61,.8); opacity:0; pointer-events:none; transition:opacity .2s; }
   #droptip.on{ opacity:1; }
+
+  /* ---------- touch controls (mobile) ---------- */
+  html, body{ touch-action:none; overscroll-behavior:none; }
+  body{ -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; }
+  body.touch{ position:fixed; inset:0; width:100%; height:100%; overflow:hidden; }
+  #cv{ touch-action:none; }
+  .touchonly{ display:none; } body.touch .touchonly{ display:block; }
+  #touchbar{ position:fixed; left:0; right:0; bottom:0; z-index:36; display:none;
+    align-items:stretch; gap:8px; padding:10px 10px calc(10px + env(safe-area-inset-bottom));
+    background:linear-gradient(0deg, rgba(8,4,20,.85), rgba(8,4,20,0)); }
+  body.touch #touchbar.show{ display:flex; }
+  #thits{ flex:1; display:flex; gap:8px; }
+  .tlane, .thit{ font-family:inherit; font-weight:800; color:#dcd3ff; -webkit-user-select:none; user-select:none;
+    border:2px solid rgba(141,134,200,.45); background:rgba(16,9,38,.6); border-radius:12px;
+    -webkit-tap-highlight-color:transparent; touch-action:none; }
+  .tlane{ width:62px; font-size:22px; color:var(--gold); }
+  .tlane:active{ background:rgba(255,194,61,.22); }
+  .thit{ flex:1; font-size:15px; letter-spacing:.1em; min-height:76px; color:#bfe9ff; border-color:rgba(35,230,255,.4); }
+  .thit:active{ background:rgba(35,230,255,.22); box-shadow:inset 0 0 18px rgba(35,230,255,.35); }
 </style>
 </head>
 <body>
@@ -166,6 +185,16 @@
 <a id="tip" href="https://buy.stripe.com/fZubJ1bAfb1q1WF52l2Ry05" target="_blank" rel="noopener" title="Enjoying it? Tips keep the arcade running">&#9673;&nbsp;TIP JAR</a>
 <input type="file" id="modfile" accept=".mod,.MOD" style="display:none">
 <div id="droptip">DROP A .MOD FILE TO PLAY IT</div>
+
+<div id="touchbar" class="touchonly">
+  <button class="tlane" id="tlaneL" aria-label="Lane left">&#9664;</button>
+  <div id="thits">
+    <button class="thit" data-col="0">L</button>
+    <button class="thit" data-col="1">M</button>
+    <button class="thit" data-col="2">R</button>
+  </div>
+  <button class="tlane" id="tlaneR" aria-label="Lane right">&#9654;</button>
+</div>
 
 <div id="hud">
   <div class="hudcorner" id="tl">
@@ -217,6 +246,10 @@
       <div class="entrylabel">&#9733; HIGH SCORE &mdash; ENTER YOUR TAG &#9733;</div>
       <div class="tagbox"><span id="tag0">A</span><span id="tag1">A</span><span id="tag2">A</span></div>
       <div class="prompt">TYPE A&ndash;Z &nbsp;&middot;&nbsp; ENTER TO SAVE</div>
+      <div class="touchonly" style="margin-top:10px">
+        <div class="prompt">TAP A LETTER TO CHANGE IT</div>
+        <a class="exitbtn" id="tagsave" style="margin-top:10px">SAVE TAG &#9656;</a>
+      </div>
     </div>
     <div class="prompt" id="resultprompt">ENTER &mdash; AGAIN &nbsp;&middot;&nbsp; ESC &mdash; MENU</div>
   </div>
@@ -2152,6 +2185,17 @@ function move(d) {
   const nl = clamp(shipLane + d, 0, LANES - 1);
   if (nl !== shipLane) { shipLane = nl; SFX.blip(); }
 }
+const TOUCH = matchMedia('(pointer:coarse)').matches || ('ontouchstart' in window);
+function syncTouchCols() {            // show the hit buttons that match the current difficulty's sub-lanes
+  if (!TOUCH) return;
+  const cols = DIFFS[diffName].cols;
+  const active = cols === 1 ? [1] : cols === 2 ? [0, 2] : [0, 1, 2];
+  document.querySelectorAll('#thits .thit').forEach(b => {
+    const c = +b.dataset.col;
+    b.style.display = active.includes(c) ? '' : 'none';
+    b.textContent = cols === 1 ? 'HIT' : (c === 0 ? 'L' : c === 1 ? 'M' : 'R');
+  });
+}
 window.addEventListener('keydown', e => {
   if (e.code === 'Space') e.preventDefault();
   if (e.repeat) return;
@@ -2199,8 +2243,8 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('mousedown', e => {
   initAudio();
-  if (e.target && e.target.closest && e.target.closest('.mbtn,.hstab,.diffarrow,#exit,#tip')) return;
-  if (state === 'play' && !paused) fireCol(1);   // mouse = center column (casual)
+  if (e.target && e.target.closest && e.target.closest('.mbtn,.hstab,.diffarrow,.tlane,.thit,#exit,#tip')) return;
+  if (state === 'play' && !paused && !TOUCH) fireCol(1);   // mouse = center column (casual); touch uses the hit buttons
 });
 window.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('visibilitychange', () => {
@@ -2271,7 +2315,7 @@ function pollPad() {
 /* ================================================================
    MAIN LOOP + BOOT
    ================================================================ */
-let _lastTs = 0, lastDt = 1 / 60;
+let _lastTs = 0, lastDt = 1 / 60, _tbarSynced = false;
 function frame(ts) {
   requestAnimationFrame(frame);
   if (!_lastTs) { _lastTs = ts; return; }
@@ -2290,6 +2334,12 @@ function frame(ts) {
   const pillsOn = !EL('hud').classList.contains('on');
   EL('exit').classList.toggle('show', pillsOn);
   EL('tip').classList.toggle('show', pillsOn);
+  if (TOUCH) {                          // touch hit bar: only while actively playing
+    const showB = state === 'play' && !paused;
+    EL('touchbar').classList.toggle('show', showB);
+    if (showB && !_tbarSynced) { syncTouchCols(); _tbarSynced = true; }
+    else if (!showB) _tbarSynced = false;
+  }
 }
 /* ---- MOD file loading (curation workflow: drop a modarchive .mod) ---- */
 function loadModFile(file) {
@@ -2326,6 +2376,29 @@ EL('diffL').addEventListener('click', () => { if (state === 'title') cycleDiff(-
 EL('diffR').addEventListener('click', () => { if (state === 'title') cycleDiff(1); });
 EL('srclocal').addEventListener('click', () => { if (state === 'scores') setScoreSource('local'); });
 EL('srcworld').addEventListener('click', () => { if (state === 'scores') setScoreSource('world'); });
+
+/* ---- touch controls: lane ◀▶ + sub-lane hit buttons (touchstart for low latency) ---- */
+if (TOUCH) {
+  document.body.classList.add('touch');
+  EL('tlaneL').addEventListener('touchstart', e => { e.preventDefault(); initAudio(); move(-1); }, { passive: false });
+  EL('tlaneR').addEventListener('touchstart', e => { e.preventDefault(); initAudio(); move(1); }, { passive: false });
+  document.querySelectorAll('#thits .thit').forEach(b => {
+    b.addEventListener('touchstart', e => { e.preventDefault(); initAudio(); if (state === 'play' && !paused) fireCol(+b.dataset.col); }, { passive: false });
+  });
+  // touch tag entry: tap a slot to cycle its letter, SAVE commits (same path as ENTER)
+  ['tag0', 'tag1', 'tag2'].forEach((id, i) => {
+    const el = EL(id); if (!el) return;
+    el.addEventListener('click', () => {
+      if (state === 'results' && entryOpen) {
+        tagPos = i; tagChars[i] = String.fromCharCode((tagChars[i].charCodeAt(0) - 65 + 1) % 26 + 65);
+        renderTag(); SFX.blip();
+      }
+    });
+  });
+  const ts = EL('tagsave');
+  if (ts) ts.addEventListener('click', e => { e.preventDefault(); if (state === 'results' && entryOpen) uiAdvance(); });
+  syncTouchCols();
+}
 requestAnimationFrame(frame);
 
 /* debug / tinkering hooks */

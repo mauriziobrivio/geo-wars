@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>RICOCHET — A Kontinue? Game</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23061210'/><rect x='4' y='6' width='10' height='5' fill='%23ff7847'/><rect x='18' y='6' width='10' height='5' fill='%23ffc23d'/><circle cx='16' cy='22' r='4' fill='%232ee6c8'/></svg>">
 <style>
@@ -128,12 +128,27 @@
   #mutehint{ position:fixed; bottom:14px; left:50%; transform:translateX(-50%); z-index:6; pointer-events:none;
     font-size:10px; letter-spacing:.3em; color:#557a72; opacity:0; transition:opacity .4s; }
   #mutehint.on{ opacity:1; }
+
+  /* ---------- touch controls (mobile) ---------- */
+  html, body{ touch-action:none; overscroll-behavior:none; }
+  body{ -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; }
+  body.touch{ position:fixed; inset:0; width:100%; height:100%; overflow:hidden; }
+  #cv{ touch-action:none; }
+  .touchonly{ display:none; } body.touch .touchonly{ display:block; }
+  .tbtn{ position:fixed; z-index:40; font-family:inherit; font-weight:800; letter-spacing:.1em;
+    color:#fff2e4; border:1px solid rgba(110,200,180,.45); background:rgba(6,22,18,.55);
+    border-radius:50%; display:none; align-items:center; justify-content:center;
+    -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+  body.touch #tpause.show{ display:flex; }
+  #tpause{ width:46px; height:46px; top:14px; right:16px; font-size:13px; }
+  #tpause:active{ background:rgba(255,120,71,.25); }
 </style>
 </head>
 <body>
 <canvas id="cv"></canvas>
 <a id="exit" href="../" title="Back to the arcade">&#9664;&nbsp;ARCADE</a>
 <a id="tip" href="https://buy.stripe.com/fZubJ1bAfb1q1WF52l2Ry05" target="_blank" rel="noopener" title="Enjoying it? Tips keep the arcade running">&#9673;&nbsp;TIP JAR</a>
+<button class="tbtn" id="tpause" aria-label="Pause">&#10073;&#10073;</button>
 
 <div id="hud">
   <div class="hudcorner" id="tl">
@@ -168,6 +183,7 @@
     <span><b>P / ESC</b></span><span>PAUSE &nbsp;&middot;&nbsp; M MUTE</span>
   </div>
   <div class="foot">10 SECTORS &nbsp;&middot;&nbsp; GAMEPAD &amp; RUMBLE &nbsp;&middot;&nbsp; H HIGH SCORES</div>
+  <div class="foot touchonly" style="color:#2ee6c8">&#9776; TOUCH &mdash; DRAG TO MOVE THE PADDLE &middot; TAP TO LAUNCH &amp; FIRE THE LASER</div>
 </div>
 
 <div class="overlay" id="results">
@@ -180,6 +196,10 @@
       <div class="entrylabel">&#9733; HIGH SCORE &mdash; ENTER YOUR TAG &#9733;</div>
       <div class="tagbox"><span id="tag0">A</span><span id="tag1">A</span><span id="tag2">A</span></div>
       <div class="prompt">TYPE A&ndash;Z &nbsp;&middot;&nbsp; ENTER TO SAVE</div>
+      <div class="touchonly" style="margin-top:10px">
+        <div class="prompt">TAP A LETTER TO CHANGE IT</div>
+        <a class="exitbtn" id="tagsave" style="margin-top:10px">SAVE TAG &#9656;</a>
+      </div>
     </div>
     <div class="prompt" id="resultprompt">ENTER &mdash; AGAIN &nbsp;&middot;&nbsp; ESC &mdash; MENU</div>
   </div>
@@ -1454,6 +1474,41 @@ window.addEventListener('mousedown', e => {
   if (state === 'play' && !paused) { fire(); return; }
 });
 window.addEventListener('contextmenu', e => e.preventDefault());
+
+/* ---- touch: drag to move the paddle, tap to launch / fire the laser ---- */
+const TOUCH = matchMedia('(pointer:coarse)').matches || ('ontouchstart' in window);
+function touchPaddle(e) {
+  const t = e.changedTouches[0]; if (!t) return;
+  usingMouse = true;                                  // ride the smoothed mouse-follow path
+  mouseTX = clamp((t.clientX - ax) / sc, paddle.w / 2, AW - paddle.w / 2);  // paddle sits under the finger
+}
+if (TOUCH) {
+  document.body.classList.add('touch');
+  window.addEventListener('touchstart', e => {
+    initAudio();
+    if (e.target && e.target.closest && e.target.closest('.mbtn,.exitbtn,#exit,#tip,.hstab,.tbtn,#tag0,#tag1,#tag2,#tagsave')) return;
+    if (state === 'play' && !paused) { touchPaddle(e); fire(); e.preventDefault(); return; }
+    if (state === 'play' && paused) { togglePause(); e.preventDefault(); return; }   // tap to resume
+    if (state === 'results' && entryOpen) return;                                    // tag entry handles its own taps
+    if (state === 'title' || state === 'scores' || state === 'results') { uiAdvance(); e.preventDefault(); }
+  }, { passive: false });
+  window.addEventListener('touchmove', e => { if (state === 'play' && !paused) { touchPaddle(e); e.preventDefault(); } }, { passive: false });
+  window.addEventListener('touchend', e => { if (state === 'play' && !paused) e.preventDefault(); }, { passive: false });
+  EL('tpause').addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); if (state === 'play') togglePause(); }, { passive: false });
+  // touch arcade-tag entry: tap a slot to cycle its letter, SAVE commits
+  ['tag0', 'tag1', 'tag2'].forEach((id, i) => {
+    const el = EL(id); if (!el) return;
+    el.addEventListener('click', () => {
+      if (state === 'results' && entryOpen) {
+        tagPos = i; tagChars[i] = String.fromCharCode((tagChars[i].charCodeAt(0) - 65 + 1) % 26 + 65);
+        renderTag(); SFX.blip();
+      }
+    });
+  });
+  const ts = EL('tagsave');
+  if (ts) ts.addEventListener('click', e => { e.preventDefault(); if (state === 'results' && entryOpen) commitTag(); });
+}
+
 window.addEventListener('keydown', e => {
   if (e.code === 'Space') e.preventDefault();
   if (e.repeat) return;
@@ -1545,7 +1600,7 @@ function frame(ts) {
   if (state === 'play' && !paused) {
     if (keys.ArrowLeft || keys.KeyA) { paddle.x -= 620 * dt; usingMouse = false; }
     if (keys.ArrowRight || keys.KeyD) { paddle.x += 620 * dt; usingMouse = false; }
-    if (usingMouse) paddle.x += (mouseTX - paddle.x) * Math.min(1, dt * 22);   // soft follow
+    if (usingMouse) paddle.x += (mouseTX - paddle.x) * Math.min(1, dt * (TOUCH ? 60 : 22));   // touch tracks the finger tightly; mouse stays soft
     paddle.x = clamp(paddle.x, paddle.w / 2, AW - paddle.w / 2);
   }
   pollPad();
@@ -1557,6 +1612,7 @@ function frame(ts) {
   const pillsOn = !EL('hud').classList.contains('on');
   EL('exit').classList.toggle('show', pillsOn);
   EL('tip').classList.toggle('show', pillsOn);
+  if (TOUCH) EL('tpause').classList.toggle('show', state === 'play' && !paused);
 }
 EL('mplay').addEventListener('click', () => { if (state === 'title') startGame(); });
 EL('mscores').addEventListener('click', () => { if (state === 'title') { initAudio(); showScores('menu'); } });

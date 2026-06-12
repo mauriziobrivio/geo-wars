@@ -20,6 +20,8 @@ A tiny browser arcade — voxel-built games you can play instantly, no install. 
 
 Every game is a **single self-contained HTML file** — the renderer, physics, particles, music and SFX are all hand-rolled JavaScript with zero dependencies and no build step. Each one runs straight from disk or off the web.
 
+Play anywhere: keyboard, mouse, and gamepad on desktop — and **full touch controls on phones and tablets** (twin-stick pads for NEONSTORM, a hit-bar for PULSAR, drag-the-paddle for RICOCHET).
+
 ```
 index.html        ← the arcade landing page
 neonstorm/        ← NEONSTORM
@@ -31,6 +33,10 @@ CNAME             ← kontinue.games (GitHub Pages)
 ## Run locally
 
 Clone and open `index.html`, or serve the folder with any static server and visit the root.
+
+## Suggest a game
+
+Got an idea for the next tribute, or a feature you'd love? There's a **suggestion box** on the landing page — drop it in. The best ideas get pinned up for everyone to see.
 
 ## Tip jar
 
