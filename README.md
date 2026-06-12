@@ -12,6 +12,7 @@ A tiny browser arcade — voxel-built games you can play instantly, no install. 
 |---|---|---|
 | **[NEONSTORM](https://kontinue.games/neonstorm/)** | Voxel twin-stick shooter | A Geometry Wars tribute — ten enemy types, three escalating bosses, a warping neon grid, and a global leaderboard. |
 | **[PULSAR](https://kontinue.games/pulsar/)** | Rhythm / track shooter | A Frequency/Amplitude tribute — ride five instrument lanes, capture each stem to build the song. Original synth tracks, or drop in your own `.MOD` files. |
+| **[RICOCHET](https://kontinue.games/ricochet/)** | Voxel block-breaker | An Arkanoid tribute — ten hand-built sectors, chaining bombs, lasers, multi-ball, hazard capsules to dodge, and a world leaderboard. |
 
 *In development:* Stardust · GlowMaze · Fathom · Contrail.
 
@@ -23,6 +24,7 @@ Every game is a **single self-contained HTML file** — the renderer, physics, p
 index.html        ← the arcade landing page
 neonstorm/        ← NEONSTORM
 pulsar/           ← PULSAR
+ricochet/         ← RICOCHET
 CNAME             ← kontinue.games (GitHub Pages)
 ```
 
