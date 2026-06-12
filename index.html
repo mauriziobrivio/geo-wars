@@ -69,6 +69,24 @@
   .ticker b{ color:var(--cyan); } .ticker i{ color:var(--mag); font-style:normal; }
   @keyframes tick{ 0%{ transform:translateX(0); } 100%{ transform:translateX(-50%); } }
 
+  /* ---------- hall of fame (live high scores) ---------- */
+  .hof{ margin:34px 0 6px; border:3px solid #2a2150; border-radius:12px; overflow:hidden;
+    background:linear-gradient(180deg,#0c0726,#080418);
+    box-shadow:inset 0 0 30px rgba(0,0,0,.55), 0 0 30px rgba(255,194,61,.08); }
+  .hoftitle{ text-align:center; padding:11px 0; font-size:12px; letter-spacing:.42em; padding-left:.42em;
+    color:var(--gold); text-shadow:0 0 12px rgba(255,194,61,.6); border-bottom:2px solid #2a2150;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px); }
+  .hofscroll{ overflow:hidden; white-space:nowrap; padding:13px 0; background:#05030f;
+    box-shadow:inset 0 0 16px rgba(0,0,0,.7); }
+  .hofscroll > div{ display:inline-block; font-size:14px; letter-spacing:.12em; color:#dfe7ff;
+    will-change:transform; animation:tick 40s linear infinite; }
+  .hofscroll .game{ color:var(--cyan); font-weight:800; text-shadow:0 0 8px rgba(35,230,255,.5); }
+  .hofscroll .game.pl{ color:var(--gold); text-shadow:0 0 8px rgba(255,194,61,.5); }
+  .hofscroll .rk{ color:var(--mag); font-weight:800; }
+  .hofscroll .tg{ color:#fff; font-weight:800; }
+  .hofscroll .sc{ color:#7df7a0; }
+  .hofscroll .sep{ color:#534c84; margin:0 8px; }
+
   .select{ text-align:center; margin:30px 0 18px; font-size:clamp(13px,2.6vw,17px); font-weight:700;
     letter-spacing:.4em; padding-left:.4em; color:var(--cyan); text-shadow:0 0 14px rgba(35,230,255,.7);
     animation:pulse 1.8s ease-in-out infinite; }
@@ -197,6 +215,11 @@
     </a>
   </main>
 
+  <section class="hof">
+    <div class="hoftitle">&#9733;&nbsp; HALL OF FAME &mdash; WORLD TOP SCORES &nbsp;&#9733;</div>
+    <div class="hofscroll"><div id="hoftext">&nbsp;&nbsp;&nbsp;LOADING HIGH SCORES&hellip;</div></div>
+  </section>
+
   <div class="soonhead">&mdash;&nbsp; MORE GAMES IN <span>DEVELOPMENT</span> &nbsp;&mdash;</div>
   <div class="soon">
     <div class="mini"><span class="lock">&#128274;</span><b>STARDUST</b><small>BLOCK PUZZLE</small><span class="soonlbl">SOON</span></div>
@@ -253,6 +276,43 @@ function ring(dir){
   if (dir === 0) location.href = games[Math.random() < .5 ? 0 : 1];
   else location.href = games[dir < 0 ? 0 : 1];
 }
+
+/* ---- HALL OF FAME: live top scores from both games (Supabase REST, anon read) ---- */
+(function(){
+  var SB = 'https://artypnnxsdovgmsznlbg.supabase.co/rest/v1/';
+  var KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFydHlwbm54c2Rvdmdtc3pubGJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNjc1NTQsImV4cCI6MjA5MDY0MzU1NH0.daE4ZNhyIM22l3tAR6EeQVcmDT8QEuDlosoPzgXiEkQ';
+  var H = { apikey: KEY, Authorization: 'Bearer ' + KEY };
+  function q(path){
+    var ctrl = new AbortController(), tid = setTimeout(function(){ ctrl.abort(); }, 7000);
+    return fetch(SB + path, { headers: H, signal: ctrl.signal })
+      .then(function(r){ return r.ok ? r.json() : []; })
+      .catch(function(){ return null; })
+      .finally(function(){ clearTimeout(tid); });
+  }
+  var medal = ['①','②','③','④','⑤'];
+  function fmt(n){ return Number(n).toLocaleString('en-US'); }
+  function seg(game, arr, cls){
+    var s = '<span class="game' + (cls || '') + '">' + game + '</span> ';
+    if (!arr || !arr.length) return s + '<span class="sc">BE THE FIRST &mdash; INSERT COIN!</span>';
+    for (var i = 0; i < arr.length; i++){
+      s += '<span class="rk">' + medal[i] + '</span> <span class="tg">'
+        + ('' + arr[i].tag).replace(/[^A-Z-]/g,'') + '</span> <span class="sc">' + fmt(arr[i].score) + '</span>';
+      if (i < arr.length - 1) s += '<span class="sep">&middot;</span>';
+    }
+    return s;
+  }
+  Promise.all([
+    q('geo_wars_scores?select=tag,score&order=score.desc&limit=3'),
+    q('pulsar_scores?select=tag,score&order=score.desc&limit=3')
+  ]).then(function(res){
+    var el = document.getElementById('hoftext');
+    if (res[0] === null && res[1] === null){ el.innerHTML = '&nbsp;&nbsp;&nbsp;&#9733; INSERT COIN TO SET A RECORD &#9733;'; return; }
+    var pad = '&nbsp;&nbsp;&nbsp;&nbsp;';
+    var line = pad + seg('NEONSTORM', res[0]) + '<span class="sep">&#9670;</span>'
+      + seg('PULSAR', res[1], ' pl') + '<span class="sep">&#9670;</span>' + pad;
+    el.innerHTML = line + line;   // doubled for the seamless -50% loop
+  });
+})();
 
 /* ---- background starfield: gentle radial warp, on-brand ---- */
 (function(){

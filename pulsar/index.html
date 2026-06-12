@@ -107,11 +107,15 @@
   #hslist li.empty{ opacity:.26; }
   #hslist li.hl{ background:rgba(255,194,61,.1); border:1px solid rgba(255,194,61,.45); border-radius:3px;
     box-shadow:0 0 18px rgba(255,194,61,.18); }
-  #hstabs{ display:flex; gap:24px; justify-content:center; margin-top:12px; }
+  #hssource{ display:flex; gap:28px; justify-content:center; margin-top:12px; }
+  #hssource .hstab{ font-size:13px; }
+  #hstabs{ display:flex; gap:24px; justify-content:center; margin-top:8px; }
   .hstab{ pointer-events:auto; cursor:pointer; font-size:12px; font-weight:700; letter-spacing:.4em;
     padding:4px 6px 6px 10px; color:#665e9c; border-bottom:2px solid transparent; transition:all .15s; }
   .hstab:hover{ color:#aaa4ee; }
   .hstab.on{ color:var(--gold); border-bottom-color:rgba(255,194,61,.7); text-shadow:0 0 10px rgba(255,194,61,.6); }
+  #srcworld.on{ color:var(--cyan); border-bottom-color:rgba(35,230,255,.7); text-shadow:0 0 10px rgba(35,230,255,.6); }
+  #hslist li.netmsg{ grid-template-columns:1fr; text-align:center; color:#8d86c8; opacity:.7; }
 
   /* ---------- initials entry ---------- */
   #entry{ margin-top:20px; }
@@ -198,6 +202,10 @@
 <div class="overlay" id="scores">
   <div class="card">
     <div class="gametitle" id="scorestitle">HIGH SCORES</div>
+    <div id="hssource">
+      <span class="hstab on" id="srclocal">LOCAL</span>
+      <span class="hstab" id="srcworld">WORLD</span>
+    </div>
     <div id="hstabs"></div>
     <ol id="hslist"></ol>
     <div class="prompt" id="scoresprompt">ESC &mdash; BACK</div>
@@ -250,6 +258,48 @@ function saveHS(songId, arr) {
 }
 function loadTag() { try { return (localStorage.getItem('pulsar_tag') || 'AAA').slice(0, 3); } catch (e) { return 'AAA'; } }
 function saveTag(t) { try { localStorage.setItem('pulsar_tag', t); } catch (e) {} }
+
+/* ---------------- world leaderboard (Supabase, no libraries) ----------
+   Reads go straight to REST (RLS: select only). Submissions go through
+   the submit-pulsar-score edge function, which validates and rate-limits;
+   direct table writes are blocked. Synth tracks only — MOD runs stay local. */
+const WORLD_REST = 'https://artypnnxsdovgmsznlbg.supabase.co/rest/v1/pulsar_scores';
+const WORLD_FN = 'https://artypnnxsdovgmsznlbg.supabase.co/functions/v1/submit-pulsar-score';
+const WORLD_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFydHlwbm54c2Rvdmdtc3pubGJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNjc1NTQsImV4cCI6MjA5MDY0MzU1NH0.daE4ZNhyIM22l3tAR6EeQVcmDT8QEuDlosoPzgXiEkQ';
+const worldCache = {};        // song id → { rows, t }
+let lastWorldSubmit = null;    // { song, score } to highlight on the board
+function worldHeaders() { return { apikey: WORLD_KEY, Authorization: 'Bearer ' + WORLD_KEY, 'Content-Type': 'application/json' }; }
+function timedFetch(url, opts) {
+  const ctrl = new AbortController(), tid = setTimeout(() => ctrl.abort(), 7000);
+  opts = opts || {}; opts.signal = ctrl.signal;
+  return fetch(url, opts).finally(() => clearTimeout(tid));
+}
+async function submitWorldScore(songId, diff, score, grade, maxCombo) {
+  if (typeof fetch === 'undefined') return;
+  try {
+    lastWorldSubmit = { song: songId, score };
+    const res = await timedFetch(WORLD_FN, { method: 'POST', headers: worldHeaders(),
+      body: JSON.stringify({ tag: loadTag(), song: songId, diff, score, grade, max_combo: maxCombo }) });
+    if (!res.ok) throw 0;
+    const out = await res.json();
+    delete worldCache[songId];   // bust cache so the new entry shows
+    if (out && out.rank) showBanner('WORLD RANK #' + fmt(out.rank), '#ffc23d', 2600);
+    if (state === 'scores' && scoreSource === 'world') renderScoresList(-1);
+  } catch (e) { /* offline — local board still has it */ }
+}
+async function fetchWorldScores(songId, force) {
+  const c = worldCache[songId];
+  if (!force && c && performance.now() - c.t < 30000) return c.rows;
+  try {
+    const res = await timedFetch(
+      WORLD_REST + '?select=tag,score,grade,diff&song=eq.' + songId + '&order=score.desc,created_at.asc&limit=10',
+      { headers: worldHeaders() });
+    if (!res.ok) throw 0;
+    const rows = await res.json();
+    worldCache[songId] = { rows, t: performance.now() };
+    return rows;
+  } catch (e) { return null; }
+}
 
 /* ================================================================
    AUDIO ENGINE — synth voices + master chain.
@@ -1863,6 +1913,7 @@ function updateHUD(force) {
 }
 
 let entryOpen = false, tagChars = ['A', 'A', 'A'], tagPos = 0, pendingStamp = 0, scoresHl = -1;
+let worldEligible = false, resultGrade = 'D', resultScore = 0;
 function gradeOf() {
   const judged = hits + misses;
   const acc = judged ? hits / judged : 0;
@@ -1905,6 +1956,13 @@ function showResults() {
   EL('entry').style.display = qualifies ? '' : 'none';
   EL('resultprompt').style.display = qualifies ? 'none' : '';
   EL('results').classList.add('on');
+  // publish to the world board — synth tracks only. If a tag is being
+  // entered, defer to commitTag so the chosen tag is used; otherwise
+  // submit now with the last-used tag.
+  worldEligible = !curSongId.startsWith('mod:') && score > 0;
+  resultGrade = g; resultScore = score;
+  if (worldEligible && !qualifies)
+    submitWorldScore(curSongId, diffName, score, g, maxCombo);
 }
 function renderTag() {
   for (let i = 0; i < 3; i++) {
@@ -1921,35 +1979,64 @@ function commitTag() {
   if (row) { row.n = n; saveHS(curSongId, hsArr); }
   entryOpen = false;
   SFX.fanfare();
+  if (worldEligible) submitWorldScore(curSongId, diffName, resultScore, resultGrade, maxCombo);
   // MOD scores aren't in the song-tab list; go to menu instead of a missing tab
   if (curSongId.startsWith('mod:')) showMenu();
   else showScores('results', hsArr.indexOf(row));
 }
 
-let scoresTab = 0, scoresFrom = 'menu';
-function renderScoresList(hl) {
-  const id = SONGS[scoresTab].id;
-  const hsArr = loadHS(id);
+let scoresTab = 0, scoresFrom = 'menu', scoreSource = 'local';
+function hsRowsHtml(rows, hl, hlMatch, world) {
   let html = '';
   for (let i = 0; i < 10; i++) {
-    const e2 = hsArr[i];
+    const e2 = rows[i];
     if (!e2) {
       html += '<li class="empty"><span class="rk">#' + (i + 1) + '</span><span class="tag">---</span><span class="sc">&mdash;</span><span class="gr"></span></li>';
       continue;
     }
-    html += '<li' + (i === hl ? ' class="hl"' : '') + '><span class="rk">#' + (i + 1) +
-      '</span><span class="tag">' + ('' + e2.n).replace(/[^A-Z-]/g, '') + '</span><span class="sc">' + fmt(e2.s) +
-      '</span><span class="gr">' + (e2.g || '') + '</span></li>';
+    const tag = ('' + (e2.n || e2.tag)).replace(/[^A-Z-]/g, '');
+    const sc = e2.s != null ? e2.s : e2.score;
+    const gr = world ? ((e2.diff || '')[0] || '') + ' ' + (e2.grade || '') : (e2.g || '');
+    const hot = i === hl || (hlMatch && tag === ('' + hlMatch.n).replace(/[^A-Z-]/g, '') && sc === hlMatch.s);
+    html += '<li' + (hot ? ' class="hl"' : '') + '><span class="rk">#' + (i + 1) +
+      '</span><span class="tag">' + tag + '</span><span class="sc">' + fmt(sc) +
+      '</span><span class="gr">' + gr + '</span></li>';
   }
-  EL('hslist').innerHTML = html;
+  return html;
+}
+function hsNotice(msg) { return '<li class="netmsg"><span>' + msg + '</span></li>'; }
+function renderScoreTabs() {
+  EL('srclocal').classList.toggle('on', scoreSource === 'local');
+  EL('srcworld').classList.toggle('on', scoreSource === 'world');
   EL('hstabs').innerHTML = SONGS.map((s, i) =>
     '<span class="hstab' + (i === scoresTab ? ' on' : '') + '" data-tab="' + i + '">' + s.name + '</span>').join('');
   for (const el of document.querySelectorAll('#hstabs .hstab'))
     el.addEventListener('click', () => { scoresTab = +el.dataset.tab; renderScoresList(-1); });
 }
+function renderScoresList(hl) {
+  renderScoreTabs();
+  const id = SONGS[scoresTab].id;
+  if (scoreSource === 'local') {
+    EL('hslist').innerHTML = hsRowsHtml(loadHS(id), hl, null, false);
+  } else {
+    EL('hslist').innerHTML = hsNotice('CONTACTING SATELLITE&hellip;');
+    fetchWorldScores(id, false).then(rows => {
+      if (state !== 'scores' || scoreSource !== 'world' || SONGS[scoresTab].id !== id) return;
+      EL('hslist').innerHTML = rows
+        ? hsRowsHtml(rows, -1, lastWorldSubmit && lastWorldSubmit.song === id ? lastWorldSubmit : null, true)
+        : hsNotice('WORLD BOARD UNREACHABLE');
+    });
+  }
+}
+function setScoreSource(src) {
+  scoreSource = src;
+  scoresHl = -1;
+  renderScoresList(-1);
+}
 function showScores(from, hl) {
   scoresFrom = from || 'menu';
   if (from === 'results') scoresTab = songIdx;
+  scoreSource = 'local';
   scoresHl = hl != null ? hl : -1;
   renderScoresList(scoresHl);
   state = 'scores'; paused = false;
@@ -1958,7 +2045,7 @@ function showScores(from, hl) {
   EL('scores').classList.add('on');
   EL('scoresprompt').innerHTML = (scoresFrom === 'results'
     ? 'ENTER &mdash; PLAY AGAIN &nbsp;&middot;&nbsp; ESC &mdash; MENU'
-    : 'ENTER / ESC &mdash; BACK') + ' &nbsp;&middot;&nbsp; &larr;/&rarr; TRACK';
+    : 'ENTER / ESC &mdash; BACK') + ' &nbsp;&middot;&nbsp; &uarr;&darr; LOCAL/WORLD &nbsp;&middot;&nbsp; &larr;&rarr; TRACK';
 }
 let menuIdx = 0;
 function buildSongMenu() {
@@ -2058,6 +2145,10 @@ window.addEventListener('keydown', e => {
     renderScoresList(-1);
     return;
   }
+  if (state === 'scores' && (e.code === 'ArrowUp' || e.code === 'ArrowDown')) {
+    setScoreSource(scoreSource === 'local' ? 'world' : 'local'); SFX.blip();
+    return;
+  }
   if (state === 'title' && (e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'KeyW' || e.code === 'KeyS')) {
     const n = MENU_COUNT();
     menuIdx = (menuIdx + (e.code === 'ArrowDown' || e.code === 'KeyS' ? 1 : n - 1)) % n;
@@ -2136,6 +2227,7 @@ function pollPad() {
   } else if (state === 'scores') {
     if (dleft && !pad.prevLeft) { scoresTab = (scoresTab + SONGS.length - 1) % SONGS.length; renderScoresList(-1); }
     if (dright && !pad.prevRight) { scoresTab = (scoresTab + 1) % SONGS.length; renderScoresList(-1); }
+    if ((up && !pad.prevUp) || (down && !pad.prevDown)) setScoreSource(scoreSource === 'local' ? 'world' : 'local');
   } else if (state === 'results' && entryOpen) {
     if (dleft && !pad.prevLeft) { tagPos = Math.max(0, tagPos - 1); renderTag(); }
     if (dright && !pad.prevRight) { tagPos = Math.min(2, tagPos + 1); renderTag(); }
@@ -2204,6 +2296,8 @@ buildSongMenu();
 updateDiffLabel();
 EL('diffL').addEventListener('click', () => { if (state === 'title') cycleDiff(-1); });
 EL('diffR').addEventListener('click', () => { if (state === 'title') cycleDiff(1); });
+EL('srclocal').addEventListener('click', () => { if (state === 'scores') setScoreSource('local'); });
+EL('srcworld').addEventListener('click', () => { if (state === 'scores') setScoreSource('world'); });
 requestAnimationFrame(frame);
 
 /* debug / tinkering hooks */
@@ -2218,6 +2312,7 @@ window.PL = {
   song() { return C; },
   end: endSong, menu: showMenu, results: showResults,
   parseMOD, renderMOD, modToComp, startMod, loadModFile,   // MOD engine (Path A) test hooks
+  submitWorld: submitWorldScore, fetchWorld: fetchWorldScores, source(s) { if (s) setScoreSource(s); return scoreSource; },
   get lanes() { return LANES; },
   stats() { return { score, hits, misses, perfects, whiffs, streak, maxStreak, captures, combo, maxCombo, fullSpectrums, energy, mult, sectionIdx, shipLane, lanes: LANES, diff: diffName }; }
 };
