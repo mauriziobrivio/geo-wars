@@ -32,6 +32,10 @@ CNAME             ← kontinue.games (GitHub Pages)
 
 Clone and open `index.html`, or serve the folder with any static server and visit the root.
 
+## Tip jar
+
+Enjoying the arcade? There's a coin-door **tip jar** on the landing page — tips keep the neon on.
+
 ---
 
 © 2026 Kontinue? Games — a Brivio Advisory OÜ production. Made with ♥ and too many voxels. For a time long lost. 

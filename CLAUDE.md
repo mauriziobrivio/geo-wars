@@ -11,8 +11,8 @@ mechanic changes, or a house rule is learned, update this file in the same commi
 **Kontinue? Games** — a retro browser arcade of small, voxel-styled tributes to the
 owner's early-gaming favorites. Owned by **Brivio Advisory OÜ** (Estonia), run by
 Maurizio (GitHub `mauriziobrivio`, world-board tag **MRH**). Goal: pocket money via a
-nostalgia catalog (portals + tips later), one small game at a time, all carrying the
-studio brand. Target audience: 30–50 year olds ("oh man, I remember this!").
+nostalgia catalog (tip jar live; portals later), one small game at a time, all carrying
+the studio brand. Target audience: 30–50 year olds ("oh man, I remember this!").
 
 Naming rules: the studio carries the "?" (**Kontinue?**); **game names never do**.
 All game names must be non-trademarked originals (tributes, not clones by name).
@@ -40,7 +40,7 @@ Every game is **one self-contained HTML file, zero dependencies, no build step**
 Canvas 2D + hand-rolled voxel renderer + WebAudio synthesis. localStorage is
 per-origin (kontinue.games), so scores survive path moves within the domain.
 
-## 3. The three live games (state: 2026-06-12)
+## 3. The three live games (state: 2026-06-13)
 
 ### NEONSTORM (`/neonstorm/`)
 Twin-stick voxel arena shooter. Ten enemy types via a credit-based spawn director
@@ -85,11 +85,22 @@ tiers / feel-tuning per user playtests.
 ### Landing page (`index.html`)
 90s/2000s web aesthetic: cabinet marquee, CRT scanlines, starfield, LCD visitor
 counter, webring, ticker ("3 GAMES ONLINE NOW"), 3-up auto-fit card grid, coming-
-soon strip, and the **HALL OF FAME marquee** (`#hoftext`) — fetches top-3 from all
+soon strip, the **HALL OF FAME marquee** (`#hoftext`) — fetches top-3 from all
 three score tables via anon REST, doubled-content -50% CSS loop, graceful "BE THE
-FIRST" when a board is empty. When adding a game: new card (`.card.xx` hover color
-variants), thumbnail jpg at root, ticker text, Hall of Fame fetch + `seg()` call,
-and an exit pill *inside the game* (`#exit`, shown when HUD is off).
+FIRST" when a board is empty — and the **TIP JAR coin door** (`.coindoor`, above
+the footer). When adding a game: new card (`.card.xx` hover color variants),
+thumbnail jpg at root, ticker text, Hall of Fame fetch + `seg()` call, an exit
+pill *inside the game* (`#exit`, shown when HUD is off) and a tip pill (`#tip`,
+same visibility, top-right, in the mousedown guard).
+
+### Tip jar
+Stripe Payment Link on the Brivio Advisory Stripe account (`acct_1RoUjSHMdwHMd3yH`),
+"customers choose what to pay". The same `buy.stripe.com` URL appears **4×**:
+landing `.coinslot` + the `#tip` pill in each game — swap all with one sed over
+`grep -rl 'buy.stripe.com'`. **Copy rule:** "INSERT COIN" always means *play*
+(card buttons, select header, HOF empty states) — money UI says **TIP JAR**;
+never reuse INSERT COIN for payments. Tip pills are mouse/click-only (deliberate:
+an outbound link has no business on the gamepad path).
 
 ## 4. Supabase backend (world leaderboards)
 
@@ -185,7 +196,7 @@ Next in catalog (names settled): **Stardust** (Lumines), **GlowMaze** (Pac-Man C
 Backlog (names TBD): Bomberman→*Fuze?*, N+→*Vault?*, Castle Crashers→*Rampart?*
 (the big one — flag scope before starting). Pulsar wants: more original tracks,
 XM/IT support, surfacing MOD-run local boards. Ricochet wants: user feel-feedback,
-maybe more sectors. Monetization ideas parked: portals, tip jar.
+maybe more sectors. Monetization: tip jar **live** (§3); portals still parked.
 
 ## 9. README.md (public copy — keep in sync with the repo file)
 
@@ -225,8 +236,13 @@ maybe more sectors. Monetization ideas parked: portals, tip jar.
 > Clone and open `index.html`, or serve the folder with any static server and
 > visit the root.
 >
+> ## Tip jar
+>
+> Enjoying the arcade? There's a coin-door **tip jar** on the landing page — tips
+> keep the neon on.
+>
 > © 2026 Kontinue? Games — a Brivio Advisory OÜ production. Made with ♥ and too
-> many voxels, with Claude Code.
+> many voxels. For a time long lost.
 
 ## 10. Shipping checklist (any change)
 

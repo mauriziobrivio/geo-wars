@@ -132,6 +132,15 @@
   #exit.show{ opacity:.8; pointer-events:auto; }
   #exit.show:hover{ opacity:1; color:#eaf6ff; border-color:rgba(35,230,255,.8);
     box-shadow:0 0 18px rgba(35,230,255,.3); }
+
+  /* ---------- tip jar (coin slot) ---------- */
+  #tip{ position:fixed; top:15px; right:18px; z-index:40; font-family:inherit; font-size:11px; font-weight:700;
+    letter-spacing:.26em; padding:7px 13px 7px 12px; border-radius:5px; color:#9fb0ff; text-decoration:none;
+    background:rgba(8,6,26,.6); border:1px solid rgba(125,134,200,.35);
+    opacity:0; pointer-events:none; transition:opacity .35s, color .15s, border-color .15s, box-shadow .15s; }
+  #tip.show{ opacity:.55; pointer-events:auto; }
+  #tip.show:hover{ opacity:1; color:#fff6dc; border-color:rgba(255,179,0,.8);
+    box-shadow:0 0 18px rgba(255,179,0,.3); }
   .exitbtn{ display:inline-block; margin-top:18px; font-size:12px; font-weight:700; letter-spacing:.3em;
     padding:9px 16px; border-radius:5px; color:#aab4ee; text-decoration:none; pointer-events:auto;
     border:1px solid rgba(125,134,200,.4); transition:all .15s; }
@@ -152,6 +161,7 @@
 <body>
 <canvas id="cv"></canvas>
 <a id="exit" href="../" title="Back to the arcade">&#9664;&nbsp;ARCADE</a>
+<a id="tip" href="https://buy.stripe.com/fZubJ1bAfb1q1WF52l2Ry05" target="_blank" rel="noopener" title="Enjoying it? Tips keep the arcade running">&#9673;&nbsp;TIP JAR</a>
 
 <div id="hud">
   <div class="hudcorner" id="tl">
@@ -651,7 +661,7 @@ window.addEventListener('keyup', e => {
 window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
 window.addEventListener('mousedown', e => {
   initAudio();
-  if (e.target && e.target.closest && e.target.closest('.mbtn,.hstab')) return; // buttons/tabs handle themselves
+  if (e.target && e.target.closest && e.target.closest('.mbtn,.hstab,#exit,#tip')) return; // buttons/tabs handle themselves
   if (e.button === 0) {
     if (state === 'title') { startGame(); return; }
     if (state === 'scores') { if (scoresFrom === 'over') startGame(); else showMenu(); return; }
@@ -2364,7 +2374,7 @@ const EL = id => document.getElementById(id);
 const hudEl = EL('hud'), scoreEl = EL('score'), multEl = EL('mult'), multFill = EL('multfill'),
       bestEl = EL('best'), livesEl = EL('lives'), bombsEl = EL('bombs'), waveEl = EL('wave'),
       titleEl = EL('title'), overEl = EL('over'), pauseEl = EL('pause'), scoresEl = EL('scores'),
-      exitEl = EL('exit');
+      exitEl = EL('exit'), tipEl = EL('tip');
 let _hudScore = -1, _hudMult = -1, _hudProg = -1, _hudLives = -1, _hudBombs = -1, _hudWave = -1,
     _hudBoss = false, _hudBossHp = -1, _hudBossRef = null, pendingStamp = 0;
 
@@ -2825,8 +2835,10 @@ function frame(ts) {
   update(dtR);
   render();
 
-  // corner "exit to arcade" pill — shown on menus, hidden during play (HUD on)
-  exitEl.classList.toggle('show', !hudEl.classList.contains('on'));
+  // corner pills (exit / tip jar) — shown on menus, hidden during play (HUD on)
+  const pillsOn = !hudEl.classList.contains('on');
+  exitEl.classList.toggle('show', pillsOn);
+  tipEl.classList.toggle('show', pillsOn);
 
   // silent auto-quality
   const ms = dtR * 1000;
