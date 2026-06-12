@@ -124,6 +124,19 @@
     font-size:10px; letter-spacing:.3em; color:#565e9c; opacity:0; transition:opacity .4s; }
   #mutehint.on{ opacity:1; }
 
+  /* ---------- exit to arcade ---------- */
+  #exit{ position:fixed; top:15px; left:18px; z-index:40; font-family:inherit; font-size:11px; font-weight:700;
+    letter-spacing:.26em; padding:7px 13px 7px 12px; border-radius:5px; color:#9fb0ff; text-decoration:none;
+    background:rgba(8,6,26,.6); border:1px solid rgba(125,134,200,.35);
+    opacity:0; pointer-events:none; transition:opacity .35s, color .15s, border-color .15s, box-shadow .15s; }
+  #exit.show{ opacity:.8; pointer-events:auto; }
+  #exit.show:hover{ opacity:1; color:#eaf6ff; border-color:rgba(35,230,255,.8);
+    box-shadow:0 0 18px rgba(35,230,255,.3); }
+  .exitbtn{ display:inline-block; margin-top:18px; font-size:12px; font-weight:700; letter-spacing:.3em;
+    padding:9px 16px; border-radius:5px; color:#aab4ee; text-decoration:none; pointer-events:auto;
+    border:1px solid rgba(125,134,200,.4); transition:all .15s; }
+  .exitbtn:hover{ color:#eaf6ff; border-color:rgba(35,230,255,.8); box-shadow:0 0 18px rgba(35,230,255,.28); }
+
   /* ---------- boss health bar ---------- */
   #bossbar{ position:absolute; top:20px; left:50%; transform:translateX(-50%); width:340px;
     text-align:center; opacity:0; transition:opacity .4s; }
@@ -138,6 +151,7 @@
 </head>
 <body>
 <canvas id="cv"></canvas>
+<a id="exit" href="../" title="Back to the arcade">&#9664;&nbsp;ARCADE</a>
 
 <div id="hud">
   <div class="hudcorner" id="tl">
@@ -216,6 +230,7 @@
   <div class="card">
     <h2>PAUSED</h2>
     <div class="stats">WASD MOVE &nbsp;&middot;&nbsp; MOUSE AIM &nbsp;&middot;&nbsp; LMB FIRE &nbsp;&middot;&nbsp; SHIFT BOMB<br>P RESUME &nbsp;&middot;&nbsp; M MUTE</div>
+    <a class="exitbtn" href="../">&#9664;&nbsp; EXIT TO ARCADE</a>
   </div>
 </div>
 
@@ -2348,7 +2363,8 @@ const MULT_NEED = [8, 15, 25, 40, 60, 85, 115, 150, 190]; // streak kills → ×
 const EL = id => document.getElementById(id);
 const hudEl = EL('hud'), scoreEl = EL('score'), multEl = EL('mult'), multFill = EL('multfill'),
       bestEl = EL('best'), livesEl = EL('lives'), bombsEl = EL('bombs'), waveEl = EL('wave'),
-      titleEl = EL('title'), overEl = EL('over'), pauseEl = EL('pause'), scoresEl = EL('scores');
+      titleEl = EL('title'), overEl = EL('over'), pauseEl = EL('pause'), scoresEl = EL('scores'),
+      exitEl = EL('exit');
 let _hudScore = -1, _hudMult = -1, _hudProg = -1, _hudLives = -1, _hudBombs = -1, _hudWave = -1,
     _hudBoss = false, _hudBossHp = -1, _hudBossRef = null, pendingStamp = 0;
 
@@ -2808,6 +2824,9 @@ function frame(ts) {
   pollPad();
   update(dtR);
   render();
+
+  // corner "exit to arcade" pill — shown on menus, hidden during play (HUD on)
+  exitEl.classList.toggle('show', !hudEl.classList.contains('on'));
 
   // silent auto-quality
   const ms = dtR * 1000;
