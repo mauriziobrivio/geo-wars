@@ -96,6 +96,13 @@
   #hslist li.empty{ opacity:.26; }
   #hslist li.hl{ background:rgba(255,120,71,.1); border:1px solid rgba(255,120,71,.45); border-radius:3px;
     box-shadow:0 0 18px rgba(255,120,71,.18); }
+  #hslist li.netmsg{ grid-template-columns:1fr; text-align:center; color:#8fbcb1; opacity:.7; }
+  #hssource{ display:flex; gap:28px; justify-content:center; margin-top:12px; }
+  #hssource .hstab{ pointer-events:auto; cursor:pointer; font-size:13px; font-weight:700; letter-spacing:.4em;
+    padding:4px 6px 6px 10px; color:#557a72; border-bottom:2px solid transparent; transition:all .15s; }
+  #hssource .hstab:hover{ color:#9fd8cc; }
+  #srclocal.on{ color:var(--ember); border-bottom-color:rgba(255,120,71,.7); text-shadow:0 0 10px rgba(255,120,71,.6); }
+  #srcworld.on{ color:var(--teal); border-bottom-color:rgba(46,230,200,.7); text-shadow:0 0 10px rgba(46,230,200,.6); }
 
   /* ---------- initials entry ---------- */
   #entry{ margin-top:20px; }
@@ -172,6 +179,10 @@
 <div class="overlay" id="scores">
   <div class="card">
     <div class="gametitle">HIGH SCORES</div>
+    <div id="hssource">
+      <span class="hstab on" id="srclocal">LOCAL</span>
+      <span class="hstab" id="srcworld">WORLD</span>
+    </div>
     <ol id="hslist"></ol>
     <div class="prompt" id="scoresprompt">ESC &mdash; BACK</div>
   </div>
@@ -219,6 +230,43 @@ function saveHS(arr) {
 }
 function loadTag() { try { return (localStorage.getItem('ricochet_tag') || 'AAA').slice(0, 3); } catch (e) { return 'AAA'; } }
 function saveTag(t) { try { localStorage.setItem('ricochet_tag', t); } catch (e) {} }
+
+/* ---------------- world leaderboard (Supabase, no libraries) ----------
+   Reads via REST (RLS: select only). Submits through the
+   submit-ricochet-score edge function; direct writes are blocked. */
+const WORLD_REST = 'https://artypnnxsdovgmsznlbg.supabase.co/rest/v1/ricochet_scores';
+const WORLD_FN = 'https://artypnnxsdovgmsznlbg.supabase.co/functions/v1/submit-ricochet-score';
+const WORLD_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFydHlwbm54c2Rvdmdtc3pubGJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNjc1NTQsImV4cCI6MjA5MDY0MzU1NH0.daE4ZNhyIM22l3tAR6EeQVcmDT8QEuDlosoPzgXiEkQ';
+let worldCache = null, worldCacheT = 0, lastWorldSubmit = null;
+function worldHeaders() { return { apikey: WORLD_KEY, Authorization: 'Bearer ' + WORLD_KEY, 'Content-Type': 'application/json' }; }
+function timedFetch(url, opts) {
+  const ctrl = new AbortController(), tid = setTimeout(() => ctrl.abort(), 7000);
+  opts = opts || {}; opts.signal = ctrl.signal;
+  return fetch(url, opts).finally(() => clearTimeout(tid));
+}
+async function submitWorldScore(sc, sectors, mc) {
+  if (typeof fetch === 'undefined') return;
+  try {
+    lastWorldSubmit = { n: loadTag(), s: sc };
+    const res = await timedFetch(WORLD_FN, { method: 'POST', headers: worldHeaders(),
+      body: JSON.stringify({ tag: loadTag(), score: sc, sectors, max_combo: mc }) });
+    if (!res.ok) throw 0;
+    const out = await res.json();
+    worldCacheT = 0;
+    if (out && out.rank) showBanner('WORLD RANK #' + fmt(out.rank), '#ffc23d', 2600);
+    if (state === 'scores' && scoreSource === 'world') renderScoresList(-1);
+  } catch (e) { /* offline — local board still has it */ }
+}
+async function fetchWorldScores(force) {
+  if (!force && worldCache && performance.now() - worldCacheT < 30000) return worldCache;
+  try {
+    const res = await timedFetch(WORLD_REST + '?select=tag,score,sectors&order=score.desc,created_at.asc&limit=10',
+      { headers: worldHeaders() });
+    if (!res.ok) throw 0;
+    worldCache = await res.json(); worldCacheT = performance.now();
+    return worldCache;
+  } catch (e) { return null; }
+}
 
 /* ================================================================
    AUDIO — synth voices + a laid-back pulse loop. Bounce blips rise
@@ -529,12 +577,19 @@ function brickSprite(chr, cracked) {
 
 /* capsules (falling power-ups) */
 const POWERS = {
-  W: { col: '#2ee6c8', label: 'W', name: 'WIDE' },
-  T: { col: '#ff7847', label: 'T', name: 'TRIPLE' },
-  L: { col: '#ff4f66', label: 'L', name: 'LASER' },
-  S: { col: '#b78cff', label: 'S', name: 'SLOW' },
-  E: { col: '#ffc23d', label: '+', name: 'EXTRA BALL' }
+  // good — catch these
+  W: { col: '#2ee6c8', label: 'W', name: 'WIDE', bad: false },
+  T: { col: '#ff7847', label: '⁘', name: 'SPLIT', bad: false },
+  L: { col: '#ff4f66', label: 'L', name: 'LASER', bad: false },
+  S: { col: '#b78cff', label: 'S', name: 'SLOW', bad: false },
+  E: { col: '#ffc23d', label: '+', name: 'EXTRA BALL', bad: false },
+  // bad — dodge these
+  N: { col: '#ff3030', label: '◄►', name: 'NARROW', bad: true },
+  F: { col: '#ff3030', label: '»', name: 'FAST BALL', bad: true },
+  X: { col: '#ff3030', label: '☠', name: 'BOMB', bad: true }
 };
+const GOOD_POOL = ['W', 'T', 'T', 'L', 'S', 'E'];   // T weighted (more splits)
+const BAD_POOL = ['N', 'F', 'F', 'X'];
 
 /* ---------------- background ---------------- */
 const stars = [];
@@ -719,12 +774,17 @@ const LEVELS = [
 let state = 'title', paused = false, T = 0;
 let level = 0, score = 0, lives = 3, combo = 0, maxCombo = 0, bricksBroken = 0;
 let bricks = [], balls = [], capsules = [], bolts = [], chainQ = [];
-const paddle = { x: AW / 2, w: 88, baseW: 88, laser: 0, wide: 0, lcd: 0 };
-let slowT = 0, flashA = 0, flashRGB = [255, 255, 255], shakeT = 0, droughtT = 0;
+const paddle = { x: AW / 2, w: 88, baseW: 88, laser: 0, wide: 0, narrow: 0, lcd: 0, fire: 0 };
+let mouseTX = AW / 2;            // smoothed mouse target
+let slowT = 0, fastT = 0, flashA = 0, flashRGB = [255, 255, 255], shakeT = 0, droughtT = 0;
 let transT = 0;                  // sector-clear freeze
 let botMode = false;
 const PADDLE_Y = AH - 46, BALL_R = 7;
-const ballSpeed = () => (360 + level * 16) * (slowT > 0 ? .7 : 1);
+/* ball speed climbs while the rally stays alive (combo) — the heat of a streak */
+const ballSpeed = () => (350 + level * 15)
+  * (1 + Math.min(combo, 26) * .028)        // up to +73% at a hot streak
+  * (slowT > 0 ? .62 : 1)
+  * (fastT > 0 ? 1.5 : 1);
 
 function rumble(ms, strong, weak) {
   const gps = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -756,8 +816,9 @@ function loadLevel(n) {
     }
   });
   capsules = []; bolts = []; chainQ = [];
-  paddle.laser = 0; paddle.wide = 0; paddle.w = paddle.baseW;
-  slowT = 0; droughtT = 0;
+  paddle.laser = 0; paddle.wide = 0; paddle.narrow = 0;
+  slowT = 0; fastT = 0; droughtT = 0;
+  sizePaddle();
   resetBall();
   EL('sector').textContent = 'SECTOR ' + (n + 1);
   showBanner('SECTOR ' + (n + 1) + ' — ' + L.name, '#2ee6c8', 1600);
@@ -780,39 +841,72 @@ function fire() {
   if (state !== 'play' || paused || transT > 0) return;
   if (balls.some(b => b.stuck)) { launch(); return; }
   if (paddle.laser > 0 && paddle.lcd <= 0) {
-    paddle.lcd = .33;
-    bolts.push({ x: paddle.x - paddle.w / 2 + 8, y: PADDLE_Y - 12 });
-    bolts.push({ x: paddle.x + paddle.w / 2 - 8, y: PADDLE_Y - 12 });
+    paddle.lcd = .26;
+    bolts.push({ x: paddle.x - paddle.w / 2 + 8, y: PADDLE_Y - 14, ph: 0 });
+    bolts.push({ x: paddle.x + paddle.w / 2 - 8, y: PADDLE_Y - 14, ph: 0 });
+    paddle.fire = .12;                        // muzzle-flash + recoil timer
+    shakeT = Math.max(shakeT, .07);
+    burst(paddle.x - paddle.w / 2 + 8, PADDLE_Y - 14, [255, 110, 80], 6, 200);
+    burst(paddle.x + paddle.w / 2 - 8, PADDLE_Y - 14, [255, 110, 80], 6, 200);
     SFX.laser();
+    rumble(34, .25, .15);
+  }
+}
+const MAX_BALLS = 9;
+function splitAll() {
+  const live = balls.filter(b => !b.stuck);
+  const srcs = live.length ? live : balls.slice();
+  for (const src of srcs) {
+    for (const da of [-0.45, 0.45]) {
+      if (balls.length >= MAX_BALLS) return;
+      const sp = ballSpeed(), base = Math.atan2(src.vy || -sp, src.vx || 0);
+      balls.push({ x: src.x, y: src.y, vx: Math.cos(base + da) * sp, vy: Math.sin(base + da) * sp, stuck: false, trail: [] });
+    }
   }
 }
 
 function dropPower(x, y) {
-  if (Math.random() > .16) return;
-  const roll = Math.random();
-  const type = roll < .28 ? 'W' : roll < .50 ? 'T' : roll < .70 ? 'L' : roll < .88 ? 'S' : 'E';
-  capsules.push({ x, y, type });
+  if (Math.random() > .26) return;             // more drops = more action
+  const bad = Math.random() < .38;             // ~38% are hazards to dodge
+  const type = bad ? pick(BAD_POOL) : pick(GOOD_POOL);
+  capsules.push({ x, y, type, bad });
 }
 function applyPower(type) {
+  const P = POWERS[type];
+  EL('fx').textContent = '';
+  if (P.bad) {
+    SFX.lose();
+    showBanner('✕ ' + P.name, '#ff3030', 1100);
+    flashA = Math.max(flashA, .22); flashRGB = [255, 50, 50];
+    shakeT = Math.max(shakeT, .18);
+    rumble(120, .7, .4);
+    if (type === 'N') { paddle.narrow = 11; paddle.wide = 0; }
+    else if (type === 'F') { fastT = 7; }
+    else if (type === 'X') {                    // bomb: lose a ball, or a hard jolt if it's your last
+      const live = balls.filter(b => !b.stuck);
+      if (live.length > 1) {
+        const v = live[live.length - 1];
+        burst(v.x, v.y, [255, 70, 50], 18, 320);
+        balls.splice(balls.indexOf(v), 1);
+      } else { fastT = 5; paddle.narrow = 7; shakeT = .3; }
+    }
+    sizePaddle();
+    updateHUD();
+    return;
+  }
   SFX.power();
   rumble(80, .4, .2);
-  const P = POWERS[type];
   showBanner(P.name, P.col, 1100);
-  EL('fx').textContent = '';
-  if (type === 'W') { paddle.wide = 15; paddle.w = paddle.baseW * 1.5; }
-  else if (type === 'S') slowT = 10;
-  else if (type === 'L') paddle.laser = 8;
+  if (type === 'W') { paddle.wide = 15; paddle.narrow = 0; }
+  else if (type === 'S') { slowT = 10; fastT = 0; }
+  else if (type === 'L') paddle.laser = 9;
   else if (type === 'E') { if (lives < 5) lives++; }
-  else if (type === 'T') {
-    const live = balls.filter(b => !b.stuck);
-    const src = live[0] || balls[0];
-    if (src) for (const da of [-0.5, 0.5]) {
-      if (balls.length >= 6) break;
-      const sp = ballSpeed(), a = Math.atan2(src.vy || -sp, src.vx || 0) + da;
-      balls.push({ x: src.x, y: src.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, stuck: false, trail: [] });
-    }
-  }
+  else if (type === 'T') splitAll();
+  sizePaddle();
   updateHUD();
+}
+function sizePaddle() {
+  paddle.w = paddle.narrow > 0 ? paddle.baseW * .6 : paddle.wide > 0 ? paddle.baseW * 1.5 : paddle.baseW;
 }
 
 function damageBrick(b, fromBomb) {
@@ -864,16 +958,20 @@ function loseBall(i) {
   shakeT = .35;
   updateHUD();
   if (lives <= 0) { endGame(false); return; }
-  paddle.laser = 0; paddle.wide = 0; paddle.w = paddle.baseW; slowT = 0;
+  paddle.laser = 0; paddle.wide = 0; paddle.narrow = 0; slowT = 0; fastT = 0;
+  sizePaddle();
   resetBall();
 }
 
 function update(dt) {
   if (state !== 'play' || paused) return;
-  if (paddle.wide > 0) { paddle.wide -= dt; if (paddle.wide <= 0) paddle.w = paddle.baseW; }
+  if (paddle.wide > 0) { paddle.wide -= dt; if (paddle.wide <= 0) sizePaddle(); }
+  if (paddle.narrow > 0) { paddle.narrow -= dt; if (paddle.narrow <= 0) sizePaddle(); }
   if (paddle.laser > 0) paddle.laser -= dt;
   if (paddle.lcd > 0) paddle.lcd -= dt;
+  if (paddle.fire > 0) paddle.fire -= dt;
   if (slowT > 0) slowT -= dt;
+  if (fastT > 0) fastT -= dt;
   fxHud();
 
   // sector-clear freeze → next level
@@ -977,14 +1075,16 @@ function update(dt) {
     if (b.trail.length > 8) b.trail.shift();
   }
 
-  // laser bolts
+  // laser bolts (heavier hit — burst + spark on impact)
   for (let i = bolts.length - 1; i >= 0; i--) {
     const bo = bolts[i];
-    bo.y -= 560 * dt;
-    if (bo.y < -10) { bolts.splice(i, 1); continue; }
+    bo.ph = (bo.ph || 0) + dt;
+    bo.y -= 720 * dt;
+    if (bo.y < -16) { bolts.splice(i, 1); continue; }
     for (const br of bricks) {
       if (br.dead) continue;
-      if (bo.x > br.x && bo.x < br.x + BRICK_W && bo.y > br.y && bo.y < br.y + BRICK_H) {
+      if (bo.x > br.x - 2 && bo.x < br.x + BRICK_W + 2 && bo.y < br.y + BRICK_H && bo.y > br.y - 6) {
+        burst(bo.x, br.y + BRICK_H, [255, 130, 90], 9, 260);
         damageBrick(br, false);
         bolts.splice(i, 1);
         break;
@@ -1042,10 +1142,21 @@ function drawBricks() {
 }
 function drawPaddle() {
   const u = paddle.w * sc / 13;
+  const recoil = paddle.fire > 0 ? paddle.fire * 26 : 0;
+  const armed = paddle.laser > 0;
   ctx.globalCompositeOperation = 'lighter';
-  drawGlowAt(px(paddle.x), py(PADDLE_Y + 4), paddle.w * .8 * sc, paddle.laser > 0 ? [255, 80, 60] : [46, 230, 200], .4);
+  drawGlowAt(px(paddle.x), py(PADDLE_Y + 4), paddle.w * .8 * sc,
+    paddle.narrow > 0 ? [255, 60, 60] : armed ? [255, 80, 60] : [46, 230, 200], .4);
+  // muzzle flashes when firing
+  if (paddle.fire > 0) {
+    const fa = paddle.fire / .12;
+    for (const sx of [-1, 1]) {
+      const mx = px(paddle.x + sx * (paddle.w / 2 - 8)), my = py(PADDLE_Y - 14);
+      drawGlowAt(mx, my, 22 * sc * fa, [255, 160, 110], .8 * fa);
+    }
+  }
   ctx.globalCompositeOperation = 'source-over';
-  drawModel(paddle.laser > 0 ? M_PADDLE_L : M_PADDLE, px(paddle.x), py(PADDLE_Y), 0, u, 1.05);
+  drawModel(armed ? M_PADDLE_L : M_PADDLE, px(paddle.x), py(PADDLE_Y + recoil), 0, u, 1.05);
 }
 function drawBalls() {
   ctx.globalCompositeOperation = 'lighter';
@@ -1061,32 +1172,37 @@ function drawBalls() {
 }
 function drawCapsules() {
   ctx.textAlign = 'center';
-  ctx.font = '700 ' + Math.round(12 * sc) + 'px ui-monospace, Menlo, monospace';
   for (const cp of capsules) {
     const P = POWERS[cp.type], rgb = hexRGB(P.col);
     const x = px(cp.x), y = py(cp.y), w = 30 * sc, h = 16 * sc;
     ctx.globalCompositeOperation = 'lighter';
-    drawGlowAt(x, y, 24 * sc, rgb, .45);
+    drawGlowAt(x, y, 24 * sc, rgb, cp.bad ? .35 + .25 * Math.sin(T * 14) : .45);
     ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = 'rgba(6,20,17,.9)';
+    ctx.fillStyle = cp.bad ? 'rgba(30,6,6,.9)' : 'rgba(6,20,17,.9)';
     ctx.fillRect(x - w / 2, y - h / 2, w, h);
-    ctx.strokeStyle = P.col; ctx.lineWidth = 1.6;
+    ctx.strokeStyle = P.col; ctx.lineWidth = cp.bad ? 2.2 : 1.6;
     ctx.strokeRect(x - w / 2, y - h / 2, w, h);
     ctx.fillStyle = P.col;
+    ctx.font = '700 ' + Math.round((cp.bad ? 11 : 13) * sc) + 'px ui-monospace, Menlo, monospace';
     ctx.fillText(P.label, x, y + 4.2 * sc);
   }
   ctx.textAlign = 'left';
 }
 function drawBolts() {
   ctx.globalCompositeOperation = 'lighter';
-  ctx.strokeStyle = 'rgba(255,90,70,.9)';
-  ctx.lineWidth = Math.max(2, 3 * sc);
   for (const bo of bolts) {
-    ctx.beginPath();
-    ctx.moveTo(px(bo.x), py(bo.y));
-    ctx.lineTo(px(bo.x), py(bo.y + 14));
-    ctx.stroke();
-    drawGlowAt(px(bo.x), py(bo.y), 12 * sc, [255, 90, 70], .6);
+    const x = px(bo.x), y0 = py(bo.y), y1 = py(bo.y + 22);
+    const grd = ctx.createLinearGradient(x, y0, x, y1);
+    grd.addColorStop(0, 'rgba(255,255,255,.95)');
+    grd.addColorStop(.4, 'rgba(255,120,90,.9)');
+    grd.addColorStop(1, 'rgba(255,60,50,0)');
+    ctx.strokeStyle = grd;
+    ctx.lineWidth = Math.max(3, 5 * sc);
+    ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,240,230,.9)';
+    ctx.lineWidth = Math.max(1.2, 1.8 * sc);
+    ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, py(bo.y + 12)); ctx.stroke();
+    drawGlowAt(x, y0, 16 * sc, [255, 120, 90], .8);
   }
   ctx.globalCompositeOperation = 'source-over';
 }
@@ -1161,17 +1277,21 @@ function fxHud() {
   let s2 = [];
   if (paddle.laser > 0) s2.push('LASER ' + Math.ceil(paddle.laser) + 's');
   if (paddle.wide > 0) s2.push('WIDE ' + Math.ceil(paddle.wide) + 's');
+  if (paddle.narrow > 0) s2.push('⚠NARROW ' + Math.ceil(paddle.narrow) + 's');
+  if (fastT > 0) s2.push('⚠FAST ' + Math.ceil(fastT) + 's');
   if (slowT > 0) s2.push('SLOW ' + Math.ceil(slowT) + 's');
   const t2 = s2.join(' · ');
   if (t2 !== fxHud._p) { EL('fx').textContent = t2; fxHud._p = t2; }
 }
 
 let entryOpen = false, tagChars = ['A', 'A', 'A'], tagPos = 0, pendingStamp = 0;
+let resultScore = 0, resultSectors = 1, resultCombo = 0;
 function endGame(won) {
   state = 'results';
   EL('hud').classList.remove('on');
   if (won) { score += 5000; SFX.fanfare(); }
-  const sectors = won ? LEVELS.length : level + (levelCleared() ? 1 : 0);
+  const sectors = Math.min(won ? LEVELS.length : level + (levelCleared() ? 1 : 0), LEVELS.length);
+  resultScore = score; resultSectors = sectors; resultCombo = Math.min(maxCombo, 400);
   EL('resulttitle').textContent = won ? '★ VAULT CLEARED ★' : 'GAME OVER';
   EL('finalscore').textContent = fmt(score);
   EL('resultstats').innerHTML =
@@ -1196,6 +1316,8 @@ function endGame(won) {
   EL('entry').style.display = qualifies ? '' : 'none';
   EL('resultprompt').style.display = qualifies ? 'none' : '';
   EL('results').classList.add('on');
+  // publish to the world board (deferred to commit if entering a tag)
+  if (!qualifies && score > 0) submitWorldScore(resultScore, resultSectors, resultCombo);
 }
 function renderTag() {
   for (let i = 0; i < 3; i++) {
@@ -1212,34 +1334,55 @@ function commitTag() {
   if (row) { row.n = n; saveHS(hs); }
   entryOpen = false;
   SFX.fanfare();
+  if (resultScore > 0) submitWorldScore(resultScore, resultSectors, resultCombo);
   showScores('results', hs.indexOf(row));
 }
-let scoresFrom = 'menu';
-function renderScoresList(hl) {
-  const hs = loadHS();
+let scoresFrom = 'menu', scoreSource = 'local';
+function hsRowsHtml(rows, hl, hlMatch) {
   let html = '';
   for (let i = 0; i < 10; i++) {
-    const e2 = hs[i];
+    const e2 = rows[i];
     if (!e2) {
       html += '<li class="empty"><span class="rk">#' + (i + 1) + '</span><span class="tag">---</span><span class="sc">&mdash;</span><span class="lv"></span></li>';
       continue;
     }
-    html += '<li' + (i === hl ? ' class="hl"' : '') + '><span class="rk">#' + (i + 1) +
-      '</span><span class="tag">' + ('' + e2.n).replace(/[^A-Z-]/g, '') + '</span><span class="sc">' + fmt(e2.s) +
-      '</span><span class="lv">S' + (e2.l || 1) + '</span></li>';
+    const tag = ('' + (e2.n || e2.tag)).replace(/[^A-Z-]/g, '');
+    const s = e2.s != null ? e2.s : e2.score;
+    const lv = e2.l != null ? e2.l : (e2.sectors || 1);
+    const hot = i === hl || (hlMatch && tag === ('' + hlMatch.n).replace(/[^A-Z-]/g, '') && s === hlMatch.s);
+    html += '<li' + (hot ? ' class="hl"' : '') + '><span class="rk">#' + (i + 1) +
+      '</span><span class="tag">' + tag + '</span><span class="sc">' + fmt(s) +
+      '</span><span class="lv">S' + lv + '</span></li>';
   }
-  EL('hslist').innerHTML = html;
+  return html;
 }
+function renderScoresList(hl) {
+  EL('srclocal').classList.toggle('on', scoreSource === 'local');
+  EL('srcworld').classList.toggle('on', scoreSource === 'world');
+  if (scoreSource === 'local') {
+    EL('hslist').innerHTML = hsRowsHtml(loadHS(), hl, null);
+  } else {
+    EL('hslist').innerHTML = '<li class="netmsg"><span>CONTACTING SATELLITE&hellip;</span></li>';
+    fetchWorldScores(false).then(rows => {
+      if (state !== 'scores' || scoreSource !== 'world') return;
+      EL('hslist').innerHTML = rows
+        ? hsRowsHtml(rows, -1, lastWorldSubmit)
+        : '<li class="netmsg"><span>WORLD BOARD UNREACHABLE</span></li>';
+    });
+  }
+}
+function setScoreSource(src) { scoreSource = src; renderScoresList(-1); }
 function showScores(from, hl) {
   scoresFrom = from || 'menu';
+  scoreSource = 'local';
   renderScoresList(hl != null ? hl : -1);
   state = 'scores'; paused = false;
   EL('title').classList.remove('on'); EL('results').classList.remove('on');
   EL('pause').classList.remove('on'); EL('hud').classList.remove('on');
   EL('scores').classList.add('on');
-  EL('scoresprompt').innerHTML = scoresFrom === 'results'
+  EL('scoresprompt').innerHTML = (scoresFrom === 'results'
     ? 'ENTER &mdash; PLAY AGAIN &nbsp;&middot;&nbsp; ESC &mdash; MENU'
-    : 'ENTER / ESC &mdash; BACK';
+    : 'ENTER / ESC &mdash; BACK') + ' &nbsp;&middot;&nbsp; &uarr;&darr; LOCAL/WORLD';
 }
 let menuIdx = 0;
 function updateMenuFocus() {
@@ -1288,13 +1431,17 @@ function quitToMenu() {
    INPUT
    ================================================================ */
 const keys = {};
+let usingMouse = false;
 window.addEventListener('mousemove', e => {
-  if (state === 'play' && !paused)
-    paddle.x = clamp((e.clientX - ax) / sc, paddle.w / 2, AW - paddle.w / 2);
+  if (state === 'play' && !paused) {
+    usingMouse = true;
+    // 0.78 sensitivity so the paddle feels a touch calmer than 1:1 mouse
+    mouseTX = clamp((e.clientX - ax) / sc * .78 + AW * .11, paddle.w / 2, AW - paddle.w / 2);
+  }
 });
 window.addEventListener('mousedown', e => {
   initAudio();
-  if (e.target && e.target.closest && e.target.closest('.mbtn,.exitbtn,#exit')) return;
+  if (e.target && e.target.closest && e.target.closest('.mbtn,.exitbtn,#exit,.hstab')) return;
   if (state === 'play' && !paused) { fire(); return; }
 });
 window.addEventListener('contextmenu', e => e.preventDefault());
@@ -1313,6 +1460,9 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyH' && state === 'title') { showScores('menu'); return; }
   if (state === 'title' && (e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'KeyW' || e.code === 'KeyS')) {
     menuIdx = 1 - menuIdx; updateMenuFocus(); SFX.blip(); return;
+  }
+  if (state === 'scores' && (e.code === 'ArrowUp' || e.code === 'ArrowDown')) {
+    setScoreSource(scoreSource === 'local' ? 'world' : 'local'); SFX.blip(); return;
   }
   if (e.code === 'KeyP' || e.code === 'Escape') {
     if (state === 'play') {
@@ -1350,6 +1500,8 @@ function pollPad() {
     const up = btn(12) || (gp.axes[1] || 0) < -.55, down = btn(13) || (gp.axes[1] || 0) > .55;
     if (state === 'title') {
       if ((up && !pad.prevUp) || (down && !pad.prevDown)) { menuIdx = 1 - menuIdx; updateMenuFocus(); SFX.blip(); }
+    } else if (state === 'scores') {
+      if ((up && !pad.prevUp) || (down && !pad.prevDown)) setScoreSource(scoreSource === 'local' ? 'world' : 'local');
     } else if (state === 'results' && entryOpen) {
       if (btn(14) && !pad.prevB) { tagPos = Math.max(0, tagPos - 1); renderTag(); }
       if (btn(15) && !pad.prevB) { tagPos = Math.min(2, tagPos + 1); renderTag(); }
@@ -1380,10 +1532,12 @@ function frame(ts) {
   // visual-only decay (runs even while paused so flashes never freeze)
   if (shakeT > 0) shakeT -= dt;
   if (flashA > 0) flashA = Math.max(0, flashA - dt * 2.4);
-  // keyboard paddle
+  // paddle: keyboard (direct), mouse (smoothed follow)
   if (state === 'play' && !paused) {
-    if (keys.ArrowLeft || keys.KeyA) paddle.x = clamp(paddle.x - 620 * dt, paddle.w / 2, AW - paddle.w / 2);
-    if (keys.ArrowRight || keys.KeyD) paddle.x = clamp(paddle.x + 620 * dt, paddle.w / 2, AW - paddle.w / 2);
+    if (keys.ArrowLeft || keys.KeyA) { paddle.x -= 620 * dt; usingMouse = false; }
+    if (keys.ArrowRight || keys.KeyD) { paddle.x += 620 * dt; usingMouse = false; }
+    if (usingMouse) paddle.x += (mouseTX - paddle.x) * Math.min(1, dt * 22);   // soft follow
+    paddle.x = clamp(paddle.x, paddle.w / 2, AW - paddle.w / 2);
   }
   pollPad();
   if (!paused) {
@@ -1395,6 +1549,8 @@ function frame(ts) {
 }
 EL('mplay').addEventListener('click', () => { if (state === 'title') startGame(); });
 EL('mscores').addEventListener('click', () => { if (state === 'title') { initAudio(); showScores('menu'); } });
+EL('srclocal').addEventListener('click', () => { if (state === 'scores') setScoreSource('local'); });
+EL('srcworld').addEventListener('click', () => { if (state === 'scores') setScoreSource('world'); });
 resize();
 requestAnimationFrame(frame);
 
@@ -1406,9 +1562,13 @@ window.RC = {
   clearLevel() { for (const b of bricks) if (b.chr !== 'X') { b.dead = true; } },
   win() { endGame(true); }, die() { lives = 1; loseBall(0); },
   menu: showMenu,
+  drop(type, x, y) { capsules.push({ x: x || paddle.x, y: y || 300, type, bad: POWERS[type].bad }); },
+  source(s) { if (s) setScoreSource(s); return scoreSource; },
+  submitWorld: submitWorldScore, fetchWorld: fetchWorldScores,
   get state() { return state; },
+  get speed() { return ballSpeed(); },
   get bricksLeft() { return bricks.filter(b => !b.dead && b.chr !== 'X').length; },
-  stats() { return { level, score, lives, combo, maxCombo, bricksBroken, balls: balls.length, capsules: capsules.length, bolts: bolts.length }; }
+  stats() { return { level, score, lives, combo, maxCombo, bricksBroken, balls: balls.length, capsules: capsules.length, bolts: bolts.length, ballSpeed: Math.round(ballSpeed()), paddleW: Math.round(paddle.w) }; }
 };
 </script>
 </body>

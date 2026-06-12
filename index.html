@@ -82,6 +82,7 @@
     will-change:transform; animation:tick 40s linear infinite; }
   .hofscroll .game{ color:var(--cyan); font-weight:800; text-shadow:0 0 8px rgba(35,230,255,.5); }
   .hofscroll .game.pl{ color:var(--gold); text-shadow:0 0 8px rgba(255,194,61,.5); }
+  .hofscroll .game.rc{ color:#ff7847; text-shadow:0 0 8px rgba(255,120,71,.5); }
   .hofscroll .rk{ color:var(--mag); font-weight:800; }
   .hofscroll .tg{ color:#fff; font-weight:800; }
   .hofscroll .sc{ color:#7df7a0; }
@@ -323,13 +324,14 @@ function ring(dir){
   }
   Promise.all([
     q('geo_wars_scores?select=tag,score&order=score.desc&limit=3'),
-    q('pulsar_scores?select=tag,score&order=score.desc&limit=3')
+    q('pulsar_scores?select=tag,score&order=score.desc&limit=3'),
+    q('ricochet_scores?select=tag,score&order=score.desc&limit=3')
   ]).then(function(res){
     var el = document.getElementById('hoftext');
-    if (res[0] === null && res[1] === null){ el.innerHTML = '&nbsp;&nbsp;&nbsp;&#9733; INSERT COIN TO SET A RECORD &#9733;'; return; }
-    var pad = '&nbsp;&nbsp;&nbsp;&nbsp;';
-    var line = pad + seg('NEONSTORM', res[0]) + '<span class="sep">&#9670;</span>'
-      + seg('PULSAR', res[1], ' pl') + '<span class="sep">&#9670;</span>' + pad;
+    if (res[0] === null && res[1] === null && res[2] === null){ el.innerHTML = '&nbsp;&nbsp;&nbsp;&#9733; INSERT COIN TO SET A RECORD &#9733;'; return; }
+    var pad = '&nbsp;&nbsp;&nbsp;&nbsp;', d = '<span class="sep">&#9670;</span>';
+    var line = pad + seg('NEONSTORM', res[0]) + d + seg('PULSAR', res[1], ' pl')
+      + d + seg('RICOCHET', res[2], ' rc') + d + pad;
     el.innerHTML = line + line;   // doubled for the seamless -50% loop
   });
 })();
