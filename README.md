@@ -34,4 +34,4 @@ Clone and open `index.html`, or serve the folder with any static server and visi
 
 ---
 
-© 2026 Kontinue? Games — a Brivio Advisory OÜ production. Made with ♥ and too many voxels, with [Claude Code](https://claude.com/claude-code).
+© 2026 Kontinue? Games — a Brivio Advisory OÜ production. Made with ♥ and too many voxels. For a time long lost. 
