@@ -125,6 +125,27 @@ in each game — swap all with one sed over `grep -rl 'buy.stripe.com'`. **Copy 
 never reuse INSERT COIN for payments. Tip pills are mouse/click-only (deliberate:
 an outbound link has no business on the gamepad path).
 
+### Social share / SEO (added 2026-06-13 — free-traffic groundwork)
+Every page (landing + 3 games) carries **OpenGraph + Twitter card meta** in `<head>`
+so shared links render a real preview card, not a bare URL. Each has its own
+**1200×630 image** at the repo root: `og-home.jpg` (3-game collage) + `og-<game>.jpg`
+(real gameplay art + branded frame). Regenerate them with the canvas script pattern
+(load `/neonstorm.jpg` etc., cover-fit onto 1200×630, overlay title/tagline/footer,
+POST each to `/save?name=og-<x>.jpg`) — see the git history of this commit. `og:image`
+/`twitter:image` use **absolute** `https://kontinue.games/...` URLs (required). Each
+game results screen has a **`#sharebtn` "SHARE MY SCORE"** button (`.sharebtn`,
+per-game accent): `navigator.share` on mobile, clipboard-copy + "LINK COPIED ✓" on
+desktop; share text bakes in score + run stat (wave/sector/grade) + the play URL.
+`.sharebtn` is in every game's mousedown **and** touch `closest()` guards (house rule
+#11) so a tap can't fire the canvas. When adding a game: add its OG meta + `og-<game>.jpg`
++ a `#sharebtn` and wire `shareScore()`. **Marketing plan (Tier-by-Tier, user-driven):**
+Tier 1 = platforms that bring their own audience (itch.io, Newgrounds, HTML5 dirs —
+upload the self-contained HTML); Tier 2 = one-shot launches (Show HN / Product Hunt /
+flagship subreddit posts, led by the "single dependency-free HTML file" maker story);
+Tier 3 = warm niche communities (r/WebGames, fans of the originals — esp. starved
+Harmonix/rhythm crowd for PULSAR, Geometry Wars fans for NEONSTORM); Tier 4 =
+short-form gameplay video with the nostalgia hook. Working through these with the user.
+
 ## 4. Supabase backend (world leaderboards)
 
 Project **TaleTree** — ref `artypnnxsdovgmsznlbg` (repurposed unused project; its
