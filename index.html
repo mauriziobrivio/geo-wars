@@ -334,7 +334,7 @@
         <div class="sgmsg" id="sgmsg" role="status" aria-live="polite"></div>
       </form>
       <div class="sgfeedwrap">
-        <div class="sgfeedlbl">&#9733;&nbsp; FRESH FROM THE JAR</div>
+        <div class="sgfeedlbl">&#9733;&nbsp; FRESH FROM THE BOX</div>
         <div class="sgfeed" id="sgfeed"><div class="sgempty">Loading ideas&hellip;</div></div>
       </div>
     </div>
@@ -498,7 +498,7 @@ function ring(dir){
       .finally(function(){ clearTimeout(tid); })
       .then(function(rows){
         if (!rows || !rows.length){
-          feed.innerHTML = '<div class="sgempty">The jar’s empty &mdash; be the first to drop an idea in.' +
+          feed.innerHTML = '<div class="sgempty">The box is empty &mdash; be the first to drop an idea in.' +
             ' Best ones get pinned up here.</div>';
           return;
         }
@@ -530,7 +530,7 @@ function ring(dir){
       .then(function(res){
         if (res.ok && res.j && res.j.ok){
           msg.className = 'sgmsg ok';
-          msg.textContent = '★ IN THE JAR — we read every one. Thanks!';
+          msg.textContent = '★ IN THE BOX — we read every one. Thanks!';
           txt.value = ''; tag.value = ''; tick();
         } else {
           msg.className = 'sgmsg err';
@@ -539,7 +539,7 @@ function ring(dir){
       })
       .catch(function(){
         msg.className = 'sgmsg err';
-        msg.textContent = 'Couldn’t reach the jar — check your connection and try again.';
+        msg.textContent = 'Couldn’t reach the box — check your connection and try again.';
       })
       .finally(function(){ clearTimeout(tid); busy = false; btn.disabled = false; });
   });

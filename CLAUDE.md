@@ -147,13 +147,14 @@ policies — the "RLS Enabled No Policy" advisor INFO on them is **intentional**
 and inserts with `approved=false`. The public feed RLS only exposes approved rows,
 so **nothing user-typed shows on the site until Maurizio flips `approved`** (and
 optionally `pinned`) via the dashboard/MCP — moderate before it's visible. SQL +
-function live in `supabase/` (the rest were deployed straight through MCP and never
-checked in; these are checked in because they were authored without MCP access).
-**Still to deploy** (needs Supabase auth this session lacked): `apply_migration`
-the SQL + `deploy_edge_function submit-suggestion --no-verify-jwt`, then adversarially
-test (forged direct insert must bounce; over-length/bad-category must 400) and scrub
-test rows. Until deployed, the box degrades gracefully (feed shows "jar's empty",
-submit shows a friendly retry message).
+function checked into `supabase/` (the score boards were deployed straight through
+MCP and never checked in; these are in the repo because they were first authored
+without MCP access). **Deployed + verified 2026-06-13** (migration `suggestions_box`,
+edge fn `submit-suggestion` v1, `verify_jwt=false`): adversarially tested — valid
+submit 200, bad category / over-length / bad tag all 400, forged direct anon insert
+bounced 401 (RLS), public feed returns approved-only; test rows scrubbed. If the
+backend is ever down the box degrades gracefully (feed "box is empty", friendly
+retry on submit).
 
 Edge functions: shape validation (3-letter A-Z tag), plausibility ceilings
 (Ricochet: score ≤ 2M, sectors 1-10, combo ≤ 400; Pulsar: per-diff score ceilings,
