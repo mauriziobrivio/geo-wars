@@ -4,6 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>RICOCHET — A Kontinue? Game</title>
+<meta name="description" content="An Arkanoid tribute, voxel-built: ten sectors, chaining bombs, lasers, multi-ball, hazard capsules to dodge, and a world leaderboard. Play free in your browser.">
+<!-- social share cards -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Kontinue? Games">
+<meta property="og:url" content="https://kontinue.games/ricochet/">
+<meta property="og:title" content="RICOCHET — voxel block-breaker">
+<meta property="og:description" content="An Arkanoid tribute: ten sectors, chaining bombs, lasers, multi-ball, hazard capsules, and a world leaderboard. Play free, no install.">
+<meta property="og:image" content="https://kontinue.games/og-ricochet.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="RICOCHET — voxel block-breaker">
+<meta name="twitter:description" content="An Arkanoid tribute — ten sectors, chaining bombs, lasers, multi-ball, a world leaderboard. Play free.">
+<meta name="twitter:image" content="https://kontinue.games/og-ricochet.jpg">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23061210'/><rect x='4' y='6' width='10' height='5' fill='%23ff7847'/><rect x='18' y='6' width='10' height='5' fill='%23ffc23d'/><circle cx='16' cy='22' r='4' fill='%232ee6c8'/></svg>">
 <style>
   :root{
@@ -33,6 +47,11 @@
     padding:9px 16px; border-radius:5px; color:#9fd8cc; text-decoration:none; pointer-events:auto;
     border:1px solid rgba(110,200,180,.4); transition:all .15s; }
   .exitbtn:hover{ color:#eafff9; border-color:rgba(46,230,200,.85); box-shadow:0 0 18px rgba(46,230,200,.28); }
+  .sharebtn{ display:inline-block; margin-top:16px; cursor:pointer; font-size:12px; font-weight:800; letter-spacing:.26em;
+    padding:11px 24px; border-radius:6px; color:#1a0a04; background:var(--ember); text-decoration:none; pointer-events:auto;
+    border:2px solid var(--ember); transition:all .15s; }
+  .sharebtn:hover{ box-shadow:0 0 22px rgba(255,120,71,.6); }
+  .sharebtn.copied{ background:var(--teal); border-color:var(--teal); color:#04121a; }
 
   /* ---------- HUD ---------- */
   #hud{ position:fixed; inset:0; pointer-events:none; z-index:5; opacity:0; transition:opacity .5s; }
@@ -202,6 +221,7 @@
       </div>
     </div>
     <div class="prompt" id="resultprompt">ENTER &mdash; AGAIN &nbsp;&middot;&nbsp; ESC &mdash; MENU</div>
+    <div><a class="sharebtn" id="sharebtn">&#9733; SHARE MY SCORE</a></div>
   </div>
 </div>
 
@@ -1366,6 +1386,22 @@ function commitTag() {
   if (resultScore > 0) submitWorldScore(resultScore, resultSectors, resultCombo);
   showScores('results', hs.indexOf(row));
 }
+/* one-tap brag — native share sheet on mobile, clipboard copy elsewhere */
+function shareScore() {
+  const url = 'https://kontinue.games/ricochet/';
+  const txt = 'I scored ' + fmt(resultScore) + ' on RICOCHET — cleared to Sector ' + resultSectors + '/10. Can you beat it? 🧱';
+  const done = () => {
+    const b = EL('sharebtn'); if (!b) return;
+    b.classList.add('copied'); b.textContent = 'LINK COPIED ✓';
+    setTimeout(() => { b.classList.remove('copied'); b.innerHTML = '★ SHARE MY SCORE'; }, 1600);
+  };
+  try {
+    if (navigator.share) { navigator.share({ title: 'Kontinue? Games — RICOCHET', text: txt, url }).catch(() => {}); return; }
+  } catch (e) {}
+  const full = txt + ' ' + url;
+  if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(full).then(done).catch(() => {}); }
+  else { try { const ta = document.createElement('textarea'); ta.value = full; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); } catch (e) {} }
+}
 let scoresFrom = 'menu', scoreSource = 'local';
 function hsRowsHtml(rows, hl, hlMatch) {
   let html = '';
@@ -1470,7 +1506,7 @@ window.addEventListener('mousemove', e => {
 });
 window.addEventListener('mousedown', e => {
   initAudio();
-  if (e.target && e.target.closest && e.target.closest('.mbtn,.exitbtn,#exit,#tip,.hstab')) return;
+  if (e.target && e.target.closest && e.target.closest('.mbtn,.exitbtn,#exit,#tip,.hstab,.sharebtn')) return;
   if (state === 'play' && !paused) { fire(); return; }
 });
 window.addEventListener('contextmenu', e => e.preventDefault());
@@ -1486,7 +1522,7 @@ if (TOUCH) {
   document.body.classList.add('touch');
   window.addEventListener('touchstart', e => {
     initAudio();
-    if (e.target && e.target.closest && e.target.closest('.mbtn,.exitbtn,#exit,#tip,.hstab,.tbtn,#tag0,#tag1,#tag2,#tagsave')) return;
+    if (e.target && e.target.closest && e.target.closest('.mbtn,.exitbtn,#exit,#tip,.hstab,.tbtn,#tag0,#tag1,#tag2,#tagsave,.sharebtn')) return;
     if (state === 'play' && !paused) { touchPaddle(e); fire(); e.preventDefault(); return; }
     if (state === 'play' && paused) { togglePause(); e.preventDefault(); return; }   // tap to resume
     if (state === 'results' && entryOpen) return;                                    // tag entry handles its own taps
@@ -1616,6 +1652,7 @@ function frame(ts) {
 }
 EL('mplay').addEventListener('click', () => { if (state === 'title') startGame(); });
 EL('mscores').addEventListener('click', () => { if (state === 'title') { initAudio(); showScores('menu'); } });
+EL('sharebtn').addEventListener('click', shareScore);
 EL('srclocal').addEventListener('click', () => { if (state === 'scores') setScoreSource('local'); });
 EL('srcworld').addEventListener('click', () => { if (state === 'scores') setScoreSource('world'); });
 resize();

@@ -4,6 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>PULSAR — A Kontinue? Game</title>
+<meta name="description" content="A Frequency/Amplitude tribute, voxel-built: ride five instrument lanes, capture each stem to build the song. Original tracks or your own .MOD files. Play free.">
+<!-- social share cards -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Kontinue? Games">
+<meta property="og:url" content="https://kontinue.games/pulsar/">
+<meta property="og:title" content="PULSAR — rhythm / track shooter">
+<meta property="og:description" content="A Frequency/Amplitude tribute: ride five instrument lanes, capture each stem to build the song. Original synth tracks or drop in your own .MODs. Play free.">
+<meta property="og:image" content="https://kontinue.games/og-pulsar.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="PULSAR — rhythm / track shooter">
+<meta name="twitter:description" content="A Frequency/Amplitude tribute — five lanes, capture each stem to build the song. Play free.">
+<meta name="twitter:image" content="https://kontinue.games/og-pulsar.jpg">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='6' fill='%23ffb300'/><rect x='15' y='2' width='2' height='9' fill='%23b78cff'/><rect x='15' y='21' width='2' height='9' fill='%23b78cff'/></svg>">
 <style>
   :root{
@@ -153,6 +167,11 @@
     padding:9px 16px; border-radius:5px; color:#aaa4ee; text-decoration:none; pointer-events:auto;
     border:1px solid rgba(141,134,200,.4); transition:all .15s; }
   .exitbtn:hover{ color:#fff4dc; border-color:rgba(255,194,61,.8); box-shadow:0 0 18px rgba(255,194,61,.28); }
+  .sharebtn{ display:inline-block; margin-top:16px; cursor:pointer; font-size:12px; font-weight:800; letter-spacing:.26em;
+    padding:11px 24px; border-radius:6px; color:#1a1204; background:#ffc23d; text-decoration:none; pointer-events:auto;
+    border:2px solid #ffc23d; transition:all .15s; }
+  .sharebtn:hover{ box-shadow:0 0 22px rgba(255,194,61,.6); }
+  .sharebtn.copied{ background:#b78cff; border-color:#b78cff; color:#160a26; }
 
   #droptip{ position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
     background:rgba(6,3,15,.82); color:var(--gold); font-size:22px; font-weight:700; letter-spacing:.4em;
@@ -252,6 +271,7 @@
       </div>
     </div>
     <div class="prompt" id="resultprompt">ENTER &mdash; AGAIN &nbsp;&middot;&nbsp; ESC &mdash; MENU</div>
+    <div><a class="sharebtn" id="sharebtn">&#9733; SHARE MY SCORE</a></div>
   </div>
 </div>
 
@@ -1970,7 +1990,7 @@ function updateHUD(force) {
 }
 
 let entryOpen = false, tagChars = ['A', 'A', 'A'], tagPos = 0, pendingStamp = 0, scoresHl = -1;
-let worldEligible = false, resultGrade = 'D', resultScore = 0;
+let worldEligible = false, resultGrade = 'D', resultScore = 0, resultName = 'TRACK';
 function gradeOf() {
   const judged = hits + misses;
   const acc = judged ? hits / judged : 0;
@@ -2017,9 +2037,25 @@ function showResults() {
   // entered, defer to commitTag so the chosen tag is used; otherwise
   // submit now with the last-used tag.
   worldEligible = !curSongId.startsWith('mod:') && score > 0;
-  resultGrade = g; resultScore = score;
+  resultGrade = g; resultScore = score; resultName = name;
   if (worldEligible && !qualifies)
     submitWorldScore(curSongId, diffName, score, g, maxCombo);
+}
+/* one-tap brag — native share sheet on mobile, clipboard copy elsewhere */
+function shareScore() {
+  const url = 'https://kontinue.games/pulsar/';
+  const txt = 'I scored ' + fmt(resultScore) + ' (grade ' + resultGrade + ') on PULSAR — ' + resultName + '. Can you beat it? 🎵';
+  const done = () => {
+    const b = EL('sharebtn'); if (!b) return;
+    b.classList.add('copied'); b.textContent = 'LINK COPIED ✓';
+    setTimeout(() => { b.classList.remove('copied'); b.innerHTML = '★ SHARE MY SCORE'; }, 1600);
+  };
+  try {
+    if (navigator.share) { navigator.share({ title: 'Kontinue? Games — PULSAR', text: txt, url }).catch(() => {}); return; }
+  } catch (e) {}
+  const full = txt + ' ' + url;
+  if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(full).then(done).catch(() => {}); }
+  else { try { const ta = document.createElement('textarea'); ta.value = full; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); } catch (e) {} }
 }
 function renderTag() {
   for (let i = 0; i < 3; i++) {
@@ -2243,7 +2279,7 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('mousedown', e => {
   initAudio();
-  if (e.target && e.target.closest && e.target.closest('.mbtn,.hstab,.diffarrow,.tlane,.thit,#exit,#tip')) return;
+  if (e.target && e.target.closest && e.target.closest('.mbtn,.hstab,.diffarrow,.tlane,.thit,#exit,#tip,.sharebtn')) return;
   if (state === 'play' && !paused && !TOUCH) fireCol(1);   // mouse = center column (casual); touch uses the hit buttons
 });
 window.addEventListener('contextmenu', e => e.preventDefault());
@@ -2374,6 +2410,7 @@ buildSongMenu();
 updateDiffLabel();
 EL('diffL').addEventListener('click', () => { if (state === 'title') cycleDiff(-1); });
 EL('diffR').addEventListener('click', () => { if (state === 'title') cycleDiff(1); });
+EL('sharebtn').addEventListener('click', shareScore);
 EL('srclocal').addEventListener('click', () => { if (state === 'scores') setScoreSource('local'); });
 EL('srcworld').addEventListener('click', () => { if (state === 'scores') setScoreSource('world'); });
 
