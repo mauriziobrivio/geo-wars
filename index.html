@@ -94,23 +94,37 @@
   @keyframes pulse{ 50%{ opacity:.5; } }
 
   /* ---------- coin door (tip jar) ---------- */
-  .coindoor{ text-align:center; margin:26px 0 4px; }
-  .coinslot{ display:inline-flex; flex-direction:column; align-items:center; gap:10px;
-    padding:18px 36px 16px; border:3px solid #2a2150; border-radius:12px; text-decoration:none;
-    background:linear-gradient(180deg,#0c0726,#080418);
-    box-shadow:inset 0 0 30px rgba(0,0,0,.55), 0 0 30px rgba(255,194,61,.08);
-    transition:border-color .25s, box-shadow .25s, transform .15s; }
-  .coinslot:hover{ border-color:#4a3d80; transform:translateY(-2px);
-    box-shadow:inset 0 0 30px rgba(0,0,0,.55), 0 0 36px rgba(255,194,61,.25); }
-  .slotplate{ width:48px; height:32px; border-radius:6px; position:relative;
-    background:linear-gradient(180deg,#2a2150,#161038); border:2px solid #3a2f66;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.1), inset 0 -5px 9px rgba(0,0,0,.55); }
-  .slit{ position:absolute; left:50%; top:50%; width:5px; height:17px; transform:translate(-50%,-50%);
-    background:#030208; border-radius:2px; box-shadow:0 0 7px rgba(255,194,61,.4); }
-  .coinslot:hover .slit{ box-shadow:0 0 12px rgba(255,194,61,.9); }
-  .coinlbl{ font-size:13px; font-weight:800; letter-spacing:.42em; padding-left:.42em; color:var(--gold);
-    text-shadow:0 0 12px rgba(255,194,61,.6); animation:pulse 1.6s steps(1) infinite; }
-  .coinsub{ font-size:9.5px; letter-spacing:.18em; color:#534c84; }
+  .coindoor{ text-align:center; margin:40px 0 8px; }
+  .coinslot{ position:relative; display:inline-flex; flex-direction:column; align-items:center; gap:11px;
+    padding:30px 48px 22px; border:3px solid rgba(255,194,61,.55); border-radius:16px; text-decoration:none;
+    background:linear-gradient(180deg,#1c1330 0%,#0d0726 68%,#080418 100%);
+    box-shadow:inset 0 0 32px rgba(0,0,0,.5), 0 0 26px rgba(255,194,61,.18);
+    animation:coinglow 2.8s ease-in-out infinite;
+    transition:border-color .2s, box-shadow .25s, transform .15s; }
+  @keyframes coinglow{ 0%,100%{ box-shadow:inset 0 0 32px rgba(0,0,0,.5), 0 0 24px rgba(255,194,61,.16); }
+    50%{ box-shadow:inset 0 0 32px rgba(0,0,0,.5), 0 0 48px rgba(255,194,61,.42); } }
+  .coinslot:hover{ transform:translateY(-3px); border-color:var(--gold);
+    box-shadow:inset 0 0 32px rgba(0,0,0,.5), 0 0 60px rgba(255,194,61,.6); }
+  .coin{ width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:22px; line-height:1; color:#7a5610;
+    background:radial-gradient(circle at 36% 30%, #fff0c0, #ffc23d 56%, #c2891a 100%);
+    box-shadow:0 0 18px rgba(255,194,61,.85), inset 0 1px 2px rgba(255,255,255,.7), inset 0 -4px 6px rgba(120,80,10,.45);
+    animation:coinbob 2.4s ease-in-out infinite; }
+  @keyframes coinbob{ 0%,66%,100%{ transform:translateY(0) rotate(0); }
+    80%{ transform:translateY(7px) rotate(10deg); } 90%{ transform:translateY(1px) rotate(-3deg); } }
+  .slotplate{ width:56px; height:36px; border-radius:6px; position:relative;
+    background:linear-gradient(180deg,#3a2f12,#1c1406); border:2px solid rgba(255,194,61,.45);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.12), inset 0 -5px 9px rgba(0,0,0,.6), 0 0 14px rgba(255,194,61,.2); }
+  .slit{ position:absolute; left:50%; top:50%; width:6px; height:19px; transform:translate(-50%,-50%);
+    background:#030208; border-radius:2px; box-shadow:0 0 9px rgba(255,194,61,.6); }
+  .coinslot:hover .slit{ box-shadow:0 0 14px rgba(255,194,61,1); }
+  .coinlbl{ font-size:19px; font-weight:800; letter-spacing:.36em; padding-left:.36em; color:var(--gold);
+    text-shadow:0 0 16px rgba(255,194,61,.85); }
+  .coincta{ font-size:11.5px; font-weight:800; letter-spacing:.2em; color:#1a1204; background:var(--gold);
+    padding:8px 18px; border-radius:6px; box-shadow:0 0 18px rgba(255,194,61,.5);
+    animation:pulse 1.7s ease-in-out infinite; }
+  .coinslot:hover .coincta{ box-shadow:0 0 30px rgba(255,194,61,.9); }
+  .coinsub{ font-size:10px; letter-spacing:.16em; color:#b8a86c; max-width:340px; line-height:1.7; }
 
   /* ---------- game cards ---------- */
   .cards{ display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:22px; }
@@ -342,8 +356,10 @@
 
   <section class="coindoor">
     <a class="coinslot" href="https://buy.stripe.com/fZubJ1bAfb1q1WF52l2Ry05" target="_blank" rel="noopener" aria-label="Leave a tip — secure Stripe checkout">
+      <span class="coin">&#9733;</span>
       <span class="slotplate"><span class="slit"></span></span>
       <span class="coinlbl">TIP JAR</span>
+      <span class="coincta">DROP A COIN&nbsp;&#9656;</span>
       <span class="coinsub">ENJOYING THE ARCADE? TIPS KEEP THE NEON ON &middot; ANY AMOUNT &middot; SECURE CHECKOUT</span>
     </a>
   </section>
