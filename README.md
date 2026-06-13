@@ -42,6 +42,13 @@ Got an idea for the next tribute, or a feature you'd love? There's a **suggestio
 
 Enjoying the arcade? There's a coin-door **tip jar** on the landing page — tips keep the neon on.
 
+## License
+
+© 2026 **Brivio Advisory OÜ**. All rights reserved. This source is publicly
+viewable for transparency but is **not open-source** — see [LICENSE](LICENSE).
+Please don't redistribute or re-host the games; you're very welcome to link to
+them at [kontinue.games](https://kontinue.games).
+
 ---
 
 © 2026 Kontinue? Games — a Brivio Advisory OÜ production. Made with ♥ and too many voxels. For a time long lost. 

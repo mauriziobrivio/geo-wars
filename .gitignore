@@ -1,3 +1,5 @@
 .DS_Store
 .claude/
 dist/
+# internal project brain / strategy — local-only, never published
+CLAUDE.md
